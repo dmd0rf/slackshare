@@ -1,0 +1,205 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{booktabs}
+\usepackage{xcolor}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\theoremstyle{plain}
+\newtheorem{proposition}{Proposition}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\title{Input-oriented FDH Slack Analysis: \\ Formulation and Aggregate Decomposition}
+\author{slackshare package}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We formalize the input-oriented Free Disposal Hull (FDH) slack analysis used by the \texttt{slackshare} package.
+We define FDH-efficient input levels, compute avoidable slack per decision-making unit (DMU), and decompose
+total input across all DMUs into a system-wide ``slack share'' and per-DMU contributions. We then extend this
+analysis to panel data (multiple dates and input types) by analyzing independent cross-sectional slices.
+A worked example illustrates the method on synthetic data.
+\end{abstract}
+
+\section{Setup and Notation}
+
+Consider a set of $n$ decision-making units (DMUs), indexed $i = 1, \ldots, n$.
+Each DMU $i$ consumes a single (typically undesirable) input $x_i \ge 0$ and produces a vector of $K$ outputs
+$y_i = (y_i^1, \ldots, y_i^K) \in \mathbb{R}_{\ge 0}^K$.
+Throughout, we write vector inequalities component-wise: $y_j \ge y_i$ means $y_j^k \ge y_i^k$ for all $k = 1, \ldots, K$.
+
+\section{FDH Dominance and Efficient Input}
+
+\begin{definition}[Dominance set]
+The dominance set (or dominating set) of DMU $i$ is
+\[ D(i) = \{ j \in \{1, \ldots, n\} : y_j \ge y_i \}. \]
+By reflexivity, $i \in D(i)$ for all $i$.
+\end{definition}
+
+The efficient input level for DMU $i$ is the minimum input among all dominating units:
+\begin{equation}
+x_i^{*} = \min_{j \in D(i)} x_j.
+\end{equation}
+
+Since $i \in D(i)$, we have $x_i^* \le x_i$ always, and $x_i^*$ is well-defined and non-negative (even when $D(i) = \{i\}$ alone).
+
+\begin{proposition}
+For all $i$, $x_i^* \le x_i$. Hence, the slack $\text{slack}_i := x_i - x_i^* \ge 0$ is well-defined and non-negative.
+\end{proposition}
+\begin{proof}
+Since $i \in D(i)$, we have $x_i^* = \min_{j \in D(i)} x_j \le x_i$. \qed
+\end{proof}
+
+\section{Slack and Efficiency}
+
+The slack $\text{slack}_i = x_i - x_i^*$ represents the amount by which DMU $i$ could reduce its input while maintaining at least the same output performance (by replicating any unit in $D(i)$).
+
+A DMU is \emph{FDH-efficient} if and only if $\text{slack}_i = 0$, i.e., $x_i = x_i^*$.
+Equivalently, a DMU is efficient if it achieves the minimum input among all units that dominate it on every output.
+
+\begin{remark}
+FDH (Free Disposal Hull) imposes only free disposability and allows no convexity.
+Thus, each DMU is only compared against \emph{actually observed} dominating units, never against hypothetical convex blends.
+This contrasts with DEA (Data Envelopment Analysis), which constructs a convex frontier and can benchmark against infeasible synthetic units.
+For a given dataset, FDH yields a coarser (higher) frontier than DEA.
+\end{remark}
+
+\section{Aggregate Decomposition}
+
+Define the total input and total slack as
+\begin{align}
+X &= \sum_{i=1}^{n} x_i, \\
+S &= \sum_{i=1}^{n} \text{slack}_i.
+\end{align}
+
+The \emph{aggregate slack share} measures the fraction of total input across all DMUs that is avoidable excess:
+\begin{equation}
+\text{slack\_share} = \frac{S}{X}.
+\end{equation}
+
+Per-DMU contributions to the system are captured by two share metrics:
+\begin{align}
+\text{share\_of\_total\_input}_i &= \frac{\text{slack}_i}{X}, \\
+\text{share\_of\_total\_slack}_i &= \begin{cases} \frac{\text{slack}_i}{S} & \text{if } S > 0, \\ 0 & \text{if } S = 0. \end{cases}
+\end{align}
+
+The first metric expresses each DMU's slack as a fraction of the population's total input.
+The second expresses each DMU's waste as a fraction of system-wide waste (when any exists).
+
+\begin{proposition}
+When $S > 0$, $\sum_{i=1}^{n} \text{share\_of\_total\_slack}_i = 1$.
+\end{proposition}
+\begin{proof}
+\[\sum_{i=1}^{n} \text{share\_of\_total\_slack}_i = \sum_{i=1}^{n} \frac{\text{slack}_i}{S} = \frac{1}{S} \sum_{i=1}^{n} \text{slack}_i = \frac{S}{S} = 1. \qed\]
+\end{proof}
+
+\section{Validity Conditions}
+
+The analysis is well-defined and yields meaningful results under the following preconditions:
+
+\begin{enumerate}
+\item Each $x_i \ge 0$. (Strictly, $x_i > 0$ avoids division-by-zero in aggregate formulas; $x_i = 0$ requires case-by-case treatment.)
+\item For each $i$, the output vector $y_i$ is not identically zero: $\exists k \, y_i^k > 0$.
+  (Otherwise, DMU $i$ dominates no other units, and the dominance set $D(i) = \{i\}$ alone, which is valid but offers no insight.)
+\item The dataset is non-empty: $n \ge 1$.
+\end{enumerate}
+
+\section{Worked Numerical Example}
+
+\label{sec:example}
+
+Consider a toy dataset with $n = 4$ DMUs, a single undesirable input (e.g., emissions), and one output (e.g., revenue):
+
+\begin{table}[h]
+\centering
+\begin{tabular}{cccc}
+\toprule
+DMU & Input $x_i$ & Output $y_i$ & Efficiency \\
+\midrule
+A & 100 & 10 & ? \\
+B & 80 & 10 & ? \\
+C & 120 & 15 & ? \\
+D & 60 & 8 & ? \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Compute the dominance set for each DMU:
+
+\begin{itemize}
+\item $D(A) = \{j : y_j \ge 10\} = \{A, B, C\}$ (A, B, and C all produce $\ge 10$). Thus $x_A^* = \min(100, 80, 120) = 80$.
+\item $D(B) = \{j : y_j \ge 10\} = \{A, B, C\}$. Thus $x_B^* = \min(100, 80, 120) = 80$.
+\item $D(C) = \{j : y_j \ge 15\} = \{C\}$ (only C produces $\ge 15$). Thus $x_C^* = 120$.
+\item $D(D) = \{j : y_j \ge 8\} = \{A, B, C, D\}$ (all produce $\ge 8$). Thus $x_D^* = \min(100, 80, 120, 60) = 60$.
+\end{itemize}
+
+Compute slack and efficiency:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccccc}
+\toprule
+DMU & $x_i$ & $x_i^*$ & $\text{slack}_i$ & Efficient? \\
+\midrule
+A & 100 & 80 & 20 & No \\
+B & 80 & 80 & 0 & Yes \\
+C & 120 & 120 & 0 & Yes \\
+D & 60 & 60 & 0 & Yes \\
+\midrule
+Total & 360 & 340 & 20 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Here, DMUs B, C, and D are efficient; only A is inefficient with slack of 20 units.
+The system-wide slack share is $S / X = 20 / 360 = 0.0556$ (about 5.6\% of total input is avoidable).
+
+\section{Panel Data Analysis}
+
+When data are panel-structured (multiple dates and/or input types), the analysis extends naturally:
+we analyze independent cross-sectional slices, applying the single-input FDH method to each $(date, input\_type)$ pair.
+
+For each date $t = 1, \ldots, T$ and input type $k = 1, \ldots, K_{\text{in}}$,
+let $x_i^{(t,k)}$ denote the input value for DMU $i$ at date $t$ for input type $k$,
+and let $y_i^{(t)}$ denote the (shared) output vector for DMU $i$ at date $t$
+(outputs are typically not indexed by input type; the choice of input type does not change the set of achievable outputs in a given date).
+
+For the slice $(t, k)$, define the dominance set as
+\[ D_{t,k}(i) = \{ j : y_j^{(t)} \ge y_i^{(t)} \}, \]
+and the efficient input as
+\[ x_{i,t,k}^{*} = \min_{j \in D_{t,k}(i)} x_j^{(t,k)}. \]
+
+The slack, efficiency flag, and aggregate metrics follow as in \S\ref{sec:example}.
+Crucially, analysis of slice $(t, k)$ is \emph{independent} of all other slices:
+there is no pooling across dates or input types in the FDH frontier.
+
+\section{Discussion and Limitations}
+
+The FDH approach offers several advantages and limitations:
+
+\begin{itemize}
+\item \textbf{No hypothetical units.} Unlike DEA, FDH never compares against infeasible synthetic units,
+  reducing the risk of spurious efficient targets.
+
+\item \textbf{Single-input restriction.} The core analysis considers only one input at a time.
+  Multi-input problems must be solved separately per input (as in \texttt{slackshare}),
+  and the results do not form a unified multi-input efficiency measure.
+
+\item \textbf{Coarse frontier.} FDH's lack of convexity yields a coarser frontier than DEA,
+  potentially missing efficiency gains from convex combinations (e.g., merging or scaling DMUs).
+  For some applications, this is a feature (only observed feasible points matter); for others, a limitation.
+
+\item \textbf{Sample size sensitivity.} When $n$ is small, FDH frontiers can be degenerate
+  (e.g., every DMU may be efficient if outputs are sparse or multi-dimensional).
+  Larger datasets typically yield more informative slack patterns.
+\end{itemize}
+
+\end{document}
