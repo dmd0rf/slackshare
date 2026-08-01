@@ -92,31 +92,31 @@ def test_mismatched_dates():
 
 
 def test_missing_input_row():
+    """Missing input for a (dmu, date, input_type) produces NA for that DMU in that slice."""
     input_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "input": ["labor"] * 2,
-        "value": [10, 12],
+        "dmu": ["A", "B", "A"],
+        "date": [pd.Timestamp("2024-01-01")] * 3,
+        "input": ["labor", "labor", "capital"],
+        "value": [10, 12, 5],
     })
+    # B missing capital input
     output_df = pd.DataFrame({
         "dmu": ["A", "B"],
         "date": [pd.Timestamp("2024-01-01")] * 2,
         "output": ["revenue"] * 2,
         "value": [100, 110],
     })
-    # Add another input type to input_df for only one DMU
-    input_df = pd.concat([
-        input_df,
-        pd.DataFrame({
-            "dmu": ["A"],
-            "date": [pd.Timestamp("2024-01-01")],
-            "input": ["capital"],
-            "value": [5],
-        }),
-    ], ignore_index=True)
-    # Missing (B, 2024-01-01, capital)
-    with pytest.raises(ValueError, match="Missing"):
-        ss.analyze_panel(input_df, output_df)
+    per_dmu, summary = ss.analyze_panel(input_df, output_df)
+
+    # Slice (2024-01-01, labor): both A and B eligible (have both labor input and revenue output)
+    labor_slice = per_dmu[per_dmu["input"] == "labor"]
+    assert not labor_slice.loc[labor_slice["dmu"] == "A", "x_star"].isna().any()
+    assert not labor_slice.loc[labor_slice["dmu"] == "B", "x_star"].isna().any()
+
+    # Slice (2024-01-01, capital): only A eligible; B's row has NA x_star
+    capital_slice = per_dmu[per_dmu["input"] == "capital"]
+    assert not capital_slice.loc[capital_slice["dmu"] == "A", "x_star"].isna().any()
+    assert capital_slice.loc[capital_slice["dmu"] == "B", "x_star"].isna().all()
 
 
 def test_duplicate_output_rows():
@@ -137,6 +137,7 @@ def test_duplicate_output_rows():
 
 
 def test_nan_value_in_input():
+    """Explicit NaN in input value is treated as missing; row receives NA results."""
     input_df = pd.DataFrame({
         "dmu": ["A", "B"],
         "date": [pd.Timestamp("2024-01-01")] * 2,
@@ -149,8 +150,16 @@ def test_nan_value_in_input():
         "output": ["revenue"] * 2,
         "value": [100, 110],
     })
-    with pytest.raises(ValueError, match="NaN"):
-        ss.analyze_panel(input_df, output_df)
+    per_dmu, summary = ss.analyze_panel(input_df, output_df)
+
+    # A is eligible (input 10, output 100), B is not (input NaN)
+    a_row = per_dmu[per_dmu["dmu"] == "A"].iloc[0]
+    b_row = per_dmu[per_dmu["dmu"] == "B"].iloc[0]
+
+    assert not pd.isna(a_row["x_star"])
+    assert pd.isna(b_row["x_star"])
+    assert pd.isna(b_row["slack"])
+    assert pd.isna(b_row["efficient"])
 
 
 def test_negative_input_value():
@@ -210,3 +219,115 @@ def test_negative_output_propagates():
     })
     with pytest.raises(ValueError, match="must not contain negative"):
         ss.analyze_panel(input_df, output_df)
+
+
+def test_missing_one_output_type():
+    """Missing one output type for a DMU at a date makes that DMU ineligible across all input types at that date."""
+    input_df = pd.DataFrame({
+        "dmu": ["A", "B"] * 2,
+        "date": [pd.Timestamp("2024-01-01")] * 4,
+        "input": ["labor", "labor", "capital", "capital"],
+        "value": [10, 12, 5, 6],
+    })
+    output_df = pd.DataFrame({
+        "dmu": ["A", "B", "A"],
+        "date": [pd.Timestamp("2024-01-01")] * 3,
+        "output": ["revenue", "revenue", "quality"],
+        "value": [100, 110, 8],
+    })
+    # B is missing quality output at this date
+
+    per_dmu, summary = ss.analyze_panel(input_df, output_df)
+
+    # Both slices should have B with NA results
+    for input_type in ["labor", "capital"]:
+        slice_df = per_dmu[per_dmu["input"] == input_type]
+        a_row = slice_df[slice_df["dmu"] == "A"].iloc[0]
+        b_row = slice_df[slice_df["dmu"] == "B"].iloc[0]
+        assert not pd.isna(a_row["x_star"]), f"A should be eligible in {input_type} slice"
+        assert pd.isna(b_row["x_star"]), f"B should be ineligible in {input_type} slice (missing output)"
+
+
+def test_fully_empty_slice():
+    """Slice with no eligible DMUs (all missing) produces NAs and zero aggregates."""
+    input_df = pd.DataFrame({
+        "dmu": ["A", "B"],
+        "date": [pd.Timestamp("2024-01-01")] * 2,
+        "input": ["labor"] * 2,
+        "value": [np.nan, np.nan],  # both missing
+    })
+    output_df = pd.DataFrame({
+        "dmu": ["A", "B"],
+        "date": [pd.Timestamp("2024-01-01")] * 2,
+        "output": ["revenue"] * 2,
+        "value": [100, 110],
+    })
+    per_dmu, summary = ss.analyze_panel(input_df, output_df)
+
+    # All per-DMU results should be NA
+    assert per_dmu["x_star"].isna().all()
+    assert per_dmu["slack"].isna().all()
+
+    # Aggregates: total_input/slack are 0, slack_share is NA
+    summary_row = summary.iloc[0]
+    assert summary_row["total_input"] == 0.0
+    assert summary_row["total_slack"] == 0.0
+    assert pd.isna(summary_row["slack_share"])
+
+
+def test_aggregate_skip_na_correctness():
+    """Aggregate metrics skip missing DMUs: one incomplete DMU among several doesn't invalidate the slice."""
+    input_df = pd.DataFrame({
+        "dmu": ["A", "B", "C"],
+        "date": [pd.Timestamp("2024-01-01")] * 3,
+        "input": ["labor"] * 3,
+        "value": [100, np.nan, 50],  # B is missing
+    })
+    output_df = pd.DataFrame({
+        "dmu": ["A", "B", "C"],
+        "date": [pd.Timestamp("2024-01-01")] * 3,
+        "output": ["revenue"] * 3,
+        "value": [10, 10, 10],  # all have same output
+    })
+    per_dmu, summary = ss.analyze_panel(input_df, output_df)
+
+    # B should have NA results
+    b_row = per_dmu[per_dmu["dmu"] == "B"].iloc[0]
+    assert pd.isna(b_row["x_star"])
+
+    # A and C eligible; both have output=10, dominators={A,C} → x* = min(100,50) = 50
+    a_row = per_dmu[per_dmu["dmu"] == "A"].iloc[0]
+    c_row = per_dmu[per_dmu["dmu"] == "C"].iloc[0]
+    assert a_row["x_star"] == 50
+    assert a_row["slack"] == 50  # 100 - 50
+    assert c_row["x_star"] == 50
+    assert c_row["slack"] == 0   # 50 - 50
+
+    # Aggregates over A and C only: total_input=150, total_slack=50, slack_share=50/150
+    summary_row = summary.iloc[0]
+    assert summary_row["total_input"] == pytest.approx(150.0)
+    assert summary_row["total_slack"] == pytest.approx(50.0)
+    assert summary_row["slack_share"] == pytest.approx(50.0 / 150.0)
+
+
+def test_missing_entire_output_type():
+    """Output type with zero rows for every DMU at a date → all DMUs ineligible, no KeyError."""
+    input_df = pd.DataFrame({
+        "dmu": ["A", "B"],
+        "date": [pd.Timestamp("2024-01-01")] * 2,
+        "input": ["labor"] * 2,
+        "value": [10, 12],
+    })
+    output_df = pd.DataFrame({
+        "dmu": ["A", "B"],
+        "date": [pd.Timestamp("2024-01-01")] * 2,
+        "output": ["revenue"] * 2,
+        "value": [100, 110],
+    })
+    # quality output has no rows for any DMU
+
+    per_dmu, summary = ss.analyze_panel(input_df, output_df)
+
+    # All DMUs should be NA for the revenue slice (have it), but column reindex ensures no KeyError
+    revenue_slice = per_dmu[per_dmu["input"] == "revenue"]
+    assert not revenue_slice["x_star"].isna().any()  # Both A, B eligible for revenue

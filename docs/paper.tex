@@ -26,7 +26,9 @@ We formalize the input-oriented Free Disposal Hull (FDH) slack analysis used by 
 We define FDH-efficient input levels, compute avoidable slack per decision-making unit (DMU), and decompose
 total input across all DMUs into a system-wide ``slack share'' and per-DMU contributions. We then extend this
 analysis to panel data (multiple dates and input types) by analyzing independent cross-sectional slices.
-A worked example illustrates the method on synthetic data.
+The panel extension gracefully handles incomplete data: missing inputs or outputs for individual DMUs are treated as
+ineligible for analysis at that slice, with results propagated as NA, while aggregate metrics are computed over
+the observed (eligible) subset using skip-NA semantics. A worked example illustrates the method on synthetic data.
 \end{abstract}
 
 \section{Setup and Notation}
@@ -184,7 +186,7 @@ The slack, efficiency flag, and aggregate metrics follow as in \S\ref{sec:exampl
 Crucially, analysis of slice $(t, k)$ is \emph{independent} of all other slices:
 there is no pooling across dates or input types in the FDH frontier.
 
-\subsection{Unbalanced Panel (Intended Extension)}
+\subsection{Unbalanced Panel (Implemented)}
 
 In practice, panel data are often incomplete: a DMU may not report a given input type, may have begun or ceased operations, or may have missing output values for structural reasons. We now formalize the unbalanced case, in which inputs and outputs may legitimately be absent (NA) rather than present.
 
@@ -218,7 +220,7 @@ S_{t,k} &= \sum_{i \in E_{t,k}} \text{slack}_{i,t,k}, \\
 \text{slack\_share}_{t,k} &= \begin{cases} \frac{S_{t,k}}{X_{t,k}} & \text{if } E_{t,k} \ne \emptyset, \\ \text{NA} & \text{if } E_{t,k} = \emptyset. \end{cases}
 \end{align}
 
-Aggregates become NA only if every DMU is missing for that slice; a single incomplete DMU does not invalidate the slice's statistics.
+Note that $X_{t,k}$ and $S_{t,k}$ are always computed sums; when $E_{t,k} = \emptyset$, these are zero (empty sum), and only the ratio $\text{slack\_share}_{t,k}$ is NA. A single incomplete DMU does not invalidate the slice's statistics; aggregates remain valid over the eligible subset.
 
 \begin{proposition}[Balanced case as special case]
 The balanced case ($E_{t,k} = \{1,\ldots,n\}$ for all $(t,k)$) is recovered as a special instance of the unbalanced formulation.
@@ -264,7 +266,7 @@ The slice's aggregate metrics sum only over $E = \{A, B, D\}$: $X = 240$, $S = 2
 Missing values arise naturally in panel settings: a DMU may not yet be reporting a given input type, may have ceased operations at a certain date, or may simply lack data collection for a metric. The unbalanced formulation treats such gaps not as errors but as structural features of the data, preserving the available information for analysis (the complete-data DMUs) while flagging the incomplete rows.
 
 \begin{remark}
-The unbalanced extension described here is an \emph{intended} feature, not yet implemented in the current \texttt{analyze\_panel} function. The shipped code enforces complete data and raises \texttt{ValueError} if any entry is missing. This section documents the mathematical framework for a future release.
+The unbalanced extension is implemented in the current \texttt{analyze\_panel} function (see \texttt{slackshare/panel.py}), which gracefully handles missing/unbalanced data by NA propagation and eligible-set aggregation, exactly as formalized in this section. Prior versions enforced complete data; the current version allows missing entries per (dmu, date, input/output) combination and treats them as ineligible, matching the mathematical framework above.
 \end{remark}
 
 \section{Discussion and Limitations}
