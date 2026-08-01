@@ -167,11 +167,14 @@ The system-wide slack share is $S / X = 20 / 360 = 0.0556$ (about 5.6\% of total
 When data are panel-structured (multiple dates and/or input types), the analysis extends naturally:
 we analyze independent cross-sectional slices, applying the single-input FDH method to each $(date, input\_type)$ pair.
 
+\subsection{Balanced Panel (Current Implementation)}
+
 For each date $t = 1, \ldots, T$ and input type $k = 1, \ldots, K_{\text{in}}$,
 let $x_i^{(t,k)}$ denote the input value for DMU $i$ at date $t$ for input type $k$,
 and let $y_i^{(t)}$ denote the (shared) output vector for DMU $i$ at date $t$
 (outputs are typically not indexed by input type; the choice of input type does not change the set of achievable outputs in a given date).
 
+In the balanced case, every $(dmu, date, input\_type)$ and $(dmu, date, output\_type)$ combination is required to be observed.
 For the slice $(t, k)$, define the dominance set as
 \[ D_{t,k}(i) = \{ j : y_j^{(t)} \ge y_i^{(t)} \}, \]
 and the efficient input as
@@ -180,6 +183,89 @@ and the efficient input as
 The slack, efficiency flag, and aggregate metrics follow as in \S\ref{sec:example}.
 Crucially, analysis of slice $(t, k)$ is \emph{independent} of all other slices:
 there is no pooling across dates or input types in the FDH frontier.
+
+\subsection{Unbalanced Panel (Intended Extension)}
+
+In practice, panel data are often incomplete: a DMU may not report a given input type, may have begun or ceased operations, or may have missing output values for structural reasons. We now formalize the unbalanced case, in which inputs and outputs may legitimately be absent (NA) rather than present.
+
+Let inputs and outputs take values in $\mathbb{R}_{\ge 0} \cup \{\text{NA}\}$. For each slice $(t,k)$, define the \emph{eligible} (or observable) set as
+\begin{equation}
+E_{t,k} = \{ i : x_i^{(t,k)} \ne \text{NA} \text{ and } y_i^{(t),j} \ne \text{NA} \text{ for all } j = 1, \ldots, K_{\text{out}} \},
+\end{equation}
+i.e., the set of DMUs with fully observed input and fully observed output vector at slice $(t,k)$.
+
+Only DMUs in $E_{t,k}$ can participate in the analysis: dominance cannot be assessed without knowing all output dimensions, and an unobserved input cannot be minimized. Redefine the dominance set as
+\[ D_{t,k}(i) = \{ j \in E_{t,k} : y_j^{(t)} \ge y_i^{(t)} \}, \quad \text{for } i \in E_{t,k}. \]
+
+The efficient input is then
+\begin{equation}
+x_{i,t,k}^{*} = \begin{cases} \min_{j \in D_{t,k}(i)} x_j^{(t,k)} & \text{if } i \in E_{t,k}, \\ \text{NA} & \text{if } i \notin E_{t,k}. \end{cases}
+\end{equation}
+
+Slack and efficiency are likewise NA for any DMU outside $E_{t,k}$:
+\begin{equation}
+\text{slack}_{i,t,k} = \begin{cases} x_i^{(t,k)} - x_{i,t,k}^{*} & \text{if } i \in E_{t,k}, \\ \text{NA} & \text{if } i \notin E_{t,k}. \end{cases}
+\end{equation}
+
+\begin{remark}
+Note that Proposition 1 still holds on the eligible set: for $i \in E_{t,k}$, self-membership $i \in D_{t,k}(i)$ ensures $x_{i,t,k}^* \le x_i^{(t,k)}$, hence $\text{slack}_{i,t,k} \ge 0$.
+\end{remark}
+
+Aggregate metrics are computed over the observable sub-population only (analogous to \texttt{pandas} \texttt{skipna=True} semantics):
+\begin{align}
+X_{t,k} &= \sum_{i \in E_{t,k}} x_i^{(t,k)}, \\
+S_{t,k} &= \sum_{i \in E_{t,k}} \text{slack}_{i,t,k}, \\
+\text{slack\_share}_{t,k} &= \begin{cases} \frac{S_{t,k}}{X_{t,k}} & \text{if } E_{t,k} \ne \emptyset, \\ \text{NA} & \text{if } E_{t,k} = \emptyset. \end{cases}
+\end{align}
+
+Aggregates become NA only if every DMU is missing for that slice; a single incomplete DMU does not invalidate the slice's statistics.
+
+\begin{proposition}[Balanced case as special case]
+The balanced case ($E_{t,k} = \{1,\ldots,n\}$ for all $(t,k)$) is recovered as a special instance of the unbalanced formulation.
+\end{proposition}
+\begin{proof}
+When all inputs and outputs are observed, $E_{t,k} = \{1,\ldots,n\}$, and the formulas for $D_{t,k}(i)$, $x_{i,t,k}^*$, $\text{slack}_{i,t,k}$, and aggregate metrics reduce identically to the balanced definitions. \qed
+\end{proof}
+
+\subsubsection{Micro-Example: Unbalanced Data}
+
+Continuing the toy dataset from \S\ref{sec:example}, suppose we analyze this data at a specific date and input type, but DMU C's output is not recorded (NA) at this time.
+The observable set is $E = \{A, B, D\}$, and C receives an entirely NA row.
+
+Dominance sets restricted to $E$:
+\begin{itemize}
+\item $D(A) = \{j \in E : y_j \ge 10\} = \{A, B\}$. Thus $x_A^* = \min(100, 80) = 80$.
+\item $D(B) = \{j \in E : y_j \ge 10\} = \{A, B\}$. Thus $x_B^* = \min(100, 80) = 80$.
+\item $D(C) = \text{NA}$ (C is not in $E$).
+\item $D(D) = \{j \in E : y_j \ge 8\} = \{A, B, D\}$. Thus $x_D^* = \min(100, 80, 60) = 60$.
+\end{itemize}
+
+Results:
+\begin{table}[h]
+\centering
+\begin{tabular}{ccccc}
+\toprule
+DMU & $x_i$ & $y_i$ & $x_i^*$ & Slack \\
+\midrule
+A & 100 & 10 & 80 & 20 \\
+B & 80 & 10 & 80 & 0 \\
+C & 120 & NA & NA & NA \\
+D & 60 & 8 & 60 & 0 \\
+\midrule
+Total ($E$ only) & 240 & --- & 220 & 20 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The slice's aggregate metrics sum only over $E = \{A, B, D\}$: $X = 240$, $S = 20$, $\text{slack\_share} = 20/240 = 0.0833$ (8.33\%).
+
+\subsubsection{Practical Motivation}
+
+Missing values arise naturally in panel settings: a DMU may not yet be reporting a given input type, may have ceased operations at a certain date, or may simply lack data collection for a metric. The unbalanced formulation treats such gaps not as errors but as structural features of the data, preserving the available information for analysis (the complete-data DMUs) while flagging the incomplete rows.
+
+\begin{remark}
+The unbalanced extension described here is an \emph{intended} feature, not yet implemented in the current \texttt{analyze\_panel} function. The shipped code enforces complete data and raises \texttt{ValueError} if any entry is missing. This section documents the mathematical framework for a future release.
+\end{remark}
 
 \section{Discussion and Limitations}
 
