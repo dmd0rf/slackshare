@@ -5,33 +5,26 @@ Input-oriented Free Disposal Hull (FDH) slack analysis for a single
 
 ## Concept
 
-For each DMU *i* with input `x_i` and output `y_i`, `slackshare` finds the
-FDH-efficient input level:
+For each DMU *i* with input $x_i$ and output vector $y_i$, `slackshare` computes input-oriented FDH (Free Disposal Hull) efficiency and slack:
 
-```
-x_i*    = min{ x_j : y_j >= y_i }     # smallest input among units that
-                                       # produce at least as much output
-slack_i = x_i - x_i*                  # avoidable excess input
-```
+$$x_i^{*} = \min\{x_j : y_j \ge y_i \text{ on every output dimension}\}$$
 
-Outputs can be a single column or several. With multiple outputs, `y_j >= y_i`
-means **vector (Pareto) dominance**: unit *j* must match or exceed unit *i*
-on **every** output dimension to count as a dominator.
+$$\text{slack}_i = x_i - x_i^{*}$$
 
-FDH imposes only free disposability (no convexity), so a DMU is only
-compared against *actually observed* dominating units — never a
-hypothetical convex blend of several units.
+where $x_i^*$ is the smallest input among all DMUs that *dominate* DMU *i* on every output dimension simultaneously (vector or Pareto dominance). The slack $\text{slack}_i$ is the avoidable excess input — how much the DMU could reduce input while maintaining its output performance.
 
-`slackshare` then decomposes total input across all DMUs into:
+FDH imposes only free disposability (no convexity), so a DMU is only compared against *actually observed* dominating units — never a hypothetical convex blend of several units.
 
-- **Aggregate slack share** — the proportion of total input across all
-  DMUs that is avoidable excess:
-  `slack_share = sum(slack_i) / sum(x_i)`
-- **Each DMU's share of total input** attributable to its own slack:
-  `slack_i / sum(x_i)`
-- **Each DMU's share of aggregate slack** — how much of the *system-wide
-  waste* a given DMU accounts for:
-  `slack_i / sum(slack_i)`
+`slackshare` then decomposes total input across all DMUs into aggregate and per-DMU measures:
+
+**Aggregate decomposition:**
+$$\text{slack\_share} = \frac{\sum_i \text{slack}_i}{\sum_i x_i}$$
+
+the proportion of total input across all DMUs that is avoidable excess.
+
+**Per-DMU shares:**
+- Share of total input: $\dfrac{\text{slack}_i}{\sum_i x_i}$ — DMU's slack as a fraction of the population's total input.
+- Share of aggregate slack: $\dfrac{\text{slack}_i}{\sum_i \text{slack}_i}$ — how much of the system-wide waste this DMU accounts for.
 
 ## Install
 
@@ -83,14 +76,31 @@ per_dmu, summary = ss.analyze(
 
 ```python
 scored   = ss.fdh_scores(data, input_col="emissions", output_cols=["output"])
-summary  = ss.aggregate(scored)
-with_shr = ss.dmu_shares(scored)
+summary  = ss.aggregate(scored, input_col="emissions")
+with_shr = ss.dmu_shares(scored, input_col="emissions")
+```
+
+All functions beyond `fdh_scores` require the `input_col` keyword argument to identify which column holds the input values.
+
+## Panel data
+
+For multi-date, multi-input-type workflows, use `analyze_panel`:
+
+```python
+per_dmu_df, summary_df = ss.analyze_panel(input_df, output_df)
+```
+
+where `input_df` and `output_df` are long-format DataFrames with columns `(dmu, date, input/output, value)`. The function runs FDH analysis independently across each `(date, input_type)` slice and returns per-DMU results and summary statistics concatenated across all slices. See [`examples/`](examples/) for a complete worked example with synthetic data and interactive Plotly visualizations.
+
+## Development
+
+Run tests with:
+```bash
+pytest
 ```
 
 ## Notes / scope (v0.1)
 
-- Single (undesirable) input; one or more outputs via vector/Pareto
-  dominance.
-- No convexity assumption (this is FDH, not DEA) — so scores reflect
-  pure technical/dominance-based inefficiency, not allocative or
-  convexity-driven inefficiency.
+- Single (undesirable) input; one or more outputs via vector/Pareto dominance.
+- No convexity assumption (this is FDH, not DEA) — so scores reflect pure technical/dominance-based inefficiency, not allocative or convexity-driven inefficiency.
+- Panel data support via `analyze_panel` for multi-date, multi-input-type workflows.

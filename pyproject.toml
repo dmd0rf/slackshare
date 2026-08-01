@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "slackshare"
 version = "0.1.0"
-description = "Input-oriented FDH slack analysis for a single (undesirable) input, with aggregate decomposition across DMUs."
+description = "Input-oriented FDH slack analysis for a single (undesirable) input, with aggregate decomposition across DMUs. Supports panel data (multi-date, multi-input-type) via analyze_panel."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
