@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slackshare"
+version = "0.1.0"
+description = "Input-oriented FDH slack analysis for a single (undesirable) input, with aggregate decomposition across DMUs."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pandas>=1.3",
+    "numpy>=1.20",
+]
+
+[tool.setuptools.packages.find]
+include = ["slackshare*"]
