@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from . import core as ss
-import numpy as np
 
 
 def _analyze_slice(merged: pd.DataFrame, output_types: list[str]) -> tuple[pd.DataFrame, dict]:
@@ -26,9 +26,7 @@ def _analyze_slice(merged: pd.DataFrame, output_types: list[str]) -> tuple[pd.Da
     # If any DMU is eligible, analyze the subset and backfill results by index
     if eligible_mask.any():
         eligible_df = merged[eligible_mask]
-        scored, summary = ss.analyze(
-            eligible_df, input_col="input_value", output_cols=output_types, id_col="dmu"
-        )
+        scored, summary = ss.analyze(eligible_df, input_col="input_value", output_cols=output_types, id_col="dmu")
         # Assign results back to the full frame using index alignment
         out.loc[eligible_df.index, "x_star"] = scored["x_star"].values
         out.loc[eligible_df.index, "slack"] = scored["slack"].values
@@ -112,7 +110,6 @@ def analyze_panel(input_df: pd.DataFrame, output_df: pd.DataFrame) -> tuple[pd.D
         raise ValueError(f"Date sets do not match: input {input_dates}, output {output_dates}")
 
     dmus = sorted(input_dmus)
-    dates = sorted(input_dates)
     input_types = sorted(input_df["input"].unique())
     output_types = sorted(output_df["output"].unique())
 
@@ -128,16 +125,13 @@ def analyze_panel(input_df: pd.DataFrame, output_df: pd.DataFrame) -> tuple[pd.D
 
     # Pivot outputs by date, ensuring all output_types appear as columns (even if all-NA for some)
     output_by_date = {
-        date: group.pivot(index="dmu", columns="output", values="value").reindex(
-            index=dmus, columns=output_types
-        )
+        date: group.pivot(index="dmu", columns="output", values="value").reindex(index=dmus, columns=output_types)
         for date, group in output_df.groupby("date")
     }
 
     # Groupby input for fast lookup; use .get() to gracefully return all-NA for missing slices
     input_by_date_type_dict = {
-        key: group.set_index("dmu")["value"].reindex(dmus)
-        for key, group in input_df.groupby(["date", "input"])
+        key: group.set_index("dmu")["value"].reindex(dmus) for key, group in input_df.groupby(["date", "input"])
     }
 
     per_dmu_frames = []

@@ -16,5 +16,15 @@ dependencies = [
 [project.optional-dependencies]
 example = ["plotly>=5.9.0"]
 
+[dependency-groups]
+dev = ["pytest>=7.4", "ruff>=0.6"]
+
 [tool.setuptools.packages.find]
 include = ["slackshare*"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["SIM108"]

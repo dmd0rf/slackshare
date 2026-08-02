@@ -1,37 +1,26 @@
 #!/usr/bin/env python3
 """Minimal example: analyze panel data from shared_data/ and generate HTML reports."""
 
+from pathlib import Path
+
 import pandas as pd
 import plotly.graph_objects as go
-from pathlib import Path
+
 from slackshare.panel import analyze_panel
 
 # Load CSVs and rename columns to match API expectations
 inputs = pd.read_csv("shared_data/panel_inputs.csv")
 outputs = pd.read_csv("shared_data/panel_outputs.csv")
 
-inputs = inputs.rename(columns={
-    "dmu_id": "dmu",
-    "period": "date",
-    "input_name": "input",
-    "input_value": "value"
-})
+inputs = inputs.rename(columns={"dmu_id": "dmu", "period": "date", "input_name": "input", "input_value": "value"})
 
-outputs = outputs.rename(columns={
-    "dmu_id": "dmu",
-    "period": "date",
-    "output_name": "output",
-    "output_value": "value"
-})
+outputs = outputs.rename(columns={"dmu_id": "dmu", "period": "date", "output_name": "output", "output_value": "value"})
 
 # Analyze
 per_dmu, summary = analyze_panel(inputs, outputs)
 
 # Compute slack_by_dmu: aggregate slack across all (date, input) slices
-slack_by_dmu = per_dmu.groupby("dmu").agg({
-    "slack": "sum",
-    "input_value": "sum"
-}).reset_index()
+slack_by_dmu = per_dmu.groupby("dmu").agg({"slack": "sum", "input_value": "sum"}).reset_index()
 slack_by_dmu.columns = ["dmu", "total_slack", "total_input"]
 slack_by_dmu["slack_share"] = slack_by_dmu["total_slack"] / slack_by_dmu["total_input"]
 slack_by_dmu = slack_by_dmu.sort_values("total_slack", ascending=False)
@@ -54,9 +43,9 @@ dates = sorted(per_dmu["date"].unique())
 date_labels = [pd.Timestamp(d).strftime("%Y-%m") for d in dates]
 dmu_names = sorted(per_dmu["dmu"].unique())
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("Generating HTML reports...")
-print("="*60)
+print("=" * 60)
 
 # ---- Heatmap Report ----
 heatmap_traces = []
@@ -65,24 +54,18 @@ for input_name in input_names:
     input_data = per_dmu[per_dmu["input"] == input_name].copy()
 
     # Sort DMUs by ascending mean |slack|
-    dmu_mean_slack = (
-        input_data.groupby("dmu")["slack"]
-        .apply(lambda x: x.abs().mean())
-        .sort_values(ascending=True)
-    )
+    dmu_mean_slack = input_data.groupby("dmu")["slack"].apply(lambda x: x.abs().mean()).sort_values(ascending=True)
     dmu_order = dmu_mean_slack.index.tolist()
 
     # Pivot to heatmap: rows=DMU (sorted), cols=date, values=|slack|
-    heatmap_data = input_data.pivot_table(
-        index="dmu", columns="date", values="slack", aggfunc="first"
-    )
+    heatmap_data = input_data.pivot_table(index="dmu", columns="date", values="slack", aggfunc="first")
     heatmap_data = heatmap_data.abs()
     heatmap_data = heatmap_data.reindex(index=dmu_order, columns=dates)
 
     # Pivot peer identities for tooltip
-    peer_data = input_data.pivot_table(
-        index="dmu", columns="date", values="peer", aggfunc="first"
-    ).reindex(index=dmu_order, columns=dates)
+    peer_data = input_data.pivot_table(index="dmu", columns="date", values="peer", aggfunc="first").reindex(
+        index=dmu_order, columns=dates
+    )
 
     trace = go.Heatmap(
         z=heatmap_data.values,

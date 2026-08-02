@@ -8,11 +8,13 @@ import slackshare as ss
 def sample_data():
     # DMU A: dominated by D (D has output>=10... wait check below)
     # Constructed by hand so expected results are easy to verify.
-    return pd.DataFrame({
-        "dmu": ["A", "B", "C", "D"],
-        "emissions": [100, 80, 120, 60],
-        "output": [10, 10, 15, 8],
-    })
+    return pd.DataFrame(
+        {
+            "dmu": ["A", "B", "C", "D"],
+            "emissions": [100, 80, 120, 60],
+            "output": [10, 10, 15, 8],
+        }
+    )
 
 
 def test_fdh_scores_basic(sample_data):
@@ -90,22 +92,23 @@ def test_single_dmu_is_efficient():
 # Vector (multi-output) dominance
 # ---------------------------------------------------------------------
 
+
 @pytest.fixture
 def vector_data():
     # Two outputs: revenue, quality. A unit only dominates another if it is
     # >= on BOTH dimensions.
-    return pd.DataFrame({
-        "dmu":      ["A", "B", "C", "D"],
-        "emissions": [100, 80, 90, 60],
-        "revenue":   [10, 10, 12, 8],
-        "quality":   [5, 6, 4, 5],
-    })
+    return pd.DataFrame(
+        {
+            "dmu": ["A", "B", "C", "D"],
+            "emissions": [100, 80, 90, 60],
+            "revenue": [10, 10, 12, 8],
+            "quality": [5, 6, 4, 5],
+        }
+    )
 
 
 def test_vector_dominance_basic(vector_data):
-    scored = ss.fdh_scores(
-        vector_data, input_col="emissions", output_cols=["revenue", "quality"]
-    )
+    scored = ss.fdh_scores(vector_data, input_col="emissions", output_cols=["revenue", "quality"])
 
     # A: (10,5). Dominators need revenue>=10 AND quality>=5:
     #   A(10,5) yes, B(10,6) yes, C(12,4) no (quality 4<5), D(8,5) no (revenue 8<10)
@@ -139,9 +142,7 @@ def test_vector_dominance_basic(vector_data):
 
 
 def test_vector_dominance_aggregate(vector_data):
-    per_dmu, summary = ss.analyze(
-        vector_data, input_col="emissions", output_cols=["revenue", "quality"]
-    )
+    per_dmu, summary = ss.analyze(vector_data, input_col="emissions", output_cols=["revenue", "quality"])
     assert summary["total_slack"] == 20  # only A has slack
     assert summary["total_input"] == 100 + 80 + 90 + 60
 
@@ -174,54 +175,64 @@ def test_all_zero_input_raises_on_aggregate():
 
 
 def test_zero_output_allowed():
-    data = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "input": [100, 80],
-        "revenue": [10, 5],
-        "quality": [5, 0],
-    })
+    data = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "input": [100, 80],
+            "revenue": [10, 5],
+            "quality": [5, 0],
+        }
+    )
     scored = ss.fdh_scores(data, input_col="input", output_cols=["revenue", "quality"])
     assert len(scored) == 2
     # B has quality=0 but revenue=5, so not all-zero, should process normally
 
 
 def test_negative_output_raises():
-    data = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "input": [100, 80],
-        "output": [10, -5],
-    })
+    data = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "input": [100, 80],
+            "output": [10, -5],
+        }
+    )
     with pytest.raises(ValueError, match="must not contain negative"):
         ss.fdh_scores(data, input_col="input", output_cols=["output"])
 
 
 def test_all_zero_output_single_column_raises():
-    data = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "input": [100, 80],
-        "output": [10, 0],
-    })
+    data = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "input": [100, 80],
+            "output": [10, 0],
+        }
+    )
     with pytest.raises(ValueError, match="must not be all zero"):
         ss.fdh_scores(data, input_col="input", output_cols=["output"])
 
 
 def test_all_zero_output_multiple_columns_raises():
-    data = pd.DataFrame({
-        "dmu": ["A", "B", "C"],
-        "input": [100, 80, 90],
-        "revenue": [10, 0, 5],
-        "quality": [5, 0, 3],
-    })
+    data = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "C"],
+            "input": [100, 80, 90],
+            "revenue": [10, 0, 5],
+            "quality": [5, 0, 3],
+        }
+    )
     with pytest.raises(ValueError, match="must not be all zero"):
         ss.fdh_scores(data, input_col="input", output_cols=["revenue", "quality"])
 
 
 def test_all_efficient_shares_are_zero():
-    data = pd.DataFrame({
-        "dmu": ["A", "B", "C"],
-        "input": [10, 12, 8],
-        "output": [5, 6, 4],
-    })
+    data = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "C"],
+            "input": [10, 12, 8],
+            "output": [5, 6, 4],
+        }
+    )
     scored = ss.fdh_scores(data, input_col="input", output_cols=["output"])
     per_dmu, summary = ss.dmu_shares(scored, input_col="input"), ss.aggregate(scored, input_col="input")
 
@@ -230,22 +241,26 @@ def test_all_efficient_shares_are_zero():
 
 
 def test_peer_column_exists():
-    data = pd.DataFrame({
-        "dmu": ["A", "B", "C", "D"],
-        "emissions": [100, 80, 120, 60],
-        "output": [10, 10, 15, 8],
-    })
+    data = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "C", "D"],
+            "emissions": [100, 80, 120, 60],
+            "output": [10, 10, 15, 8],
+        }
+    )
     scored = ss.fdh_scores(data, input_col="emissions", output_cols=["output"], id_col="dmu")
     assert "peer" in scored.columns
     assert len(scored["peer"]) == 4
 
 
 def test_peer_self_when_efficient():
-    data = pd.DataFrame({
-        "dmu": ["A", "B", "C", "D"],
-        "emissions": [100, 80, 120, 60],
-        "output": [10, 10, 15, 8],
-    })
+    data = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "C", "D"],
+            "emissions": [100, 80, 120, 60],
+            "output": [10, 10, 15, 8],
+        }
+    )
     scored = ss.fdh_scores(data, input_col="emissions", output_cols=["output"], id_col="dmu")
     # B, C, D are efficient; A is not
     b_row = scored.loc[scored["dmu"] == "B"].iloc[0]
@@ -257,11 +272,13 @@ def test_peer_self_when_efficient():
 
 
 def test_peer_points_to_benchmark():
-    data = pd.DataFrame({
-        "dmu": ["A", "B", "C", "D"],
-        "emissions": [100, 80, 120, 60],
-        "output": [10, 10, 15, 8],
-    })
+    data = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "C", "D"],
+            "emissions": [100, 80, 120, 60],
+            "output": [10, 10, 15, 8],
+        }
+    )
     scored = ss.fdh_scores(data, input_col="emissions", output_cols=["output"], id_col="dmu")
     # A: output=10, dominators are A, B, C (with emissions 100, 80, 120)
     # x_star should be 80, peer should be B
@@ -272,11 +289,13 @@ def test_peer_points_to_benchmark():
 
 def test_peer_alphabetical_tiebreak():
     # Two DMUs with the same input, both are benchmarks for a third
-    data = pd.DataFrame({
-        "dmu": ["Z", "A", "B"],
-        "input": [100, 50, 50],
-        "output": [5, 10, 10],
-    })
+    data = pd.DataFrame(
+        {
+            "dmu": ["Z", "A", "B"],
+            "input": [100, 50, 50],
+            "output": [5, 10, 10],
+        }
+    )
     scored = ss.fdh_scores(data, input_col="input", output_cols=["output"], id_col="dmu")
     # Z: output=5, dominators are all three: Z(100), A(50), B(50)
     # x_star = min(100, 50, 50) = 50, peer should be "A" (alphabetically before "B")
@@ -287,21 +306,26 @@ def test_peer_alphabetical_tiebreak():
 
 def test_peer_default_uses_index():
     # When id_col=None, peer should be the index value as string
-    data = pd.DataFrame({
-        "input": [100, 80, 120, 60],
-        "output": [10, 10, 15, 8],
-    }, index=["A", "B", "C", "D"])
+    data = pd.DataFrame(
+        {
+            "input": [100, 80, 120, 60],
+            "output": [10, 10, 15, 8],
+        },
+        index=["A", "B", "C", "D"],
+    )
     scored = ss.fdh_scores(data, input_col="input", output_cols=["output"], id_col=None)
     a_row = scored.loc["A"]
     assert a_row["peer"] == "B"  # B's input (80) is minimal among A's dominators
 
 
 def test_peer_with_analyze():
-    data = pd.DataFrame({
-        "dmu": ["A", "B", "C", "D"],
-        "emissions": [100, 80, 120, 60],
-        "output": [10, 10, 15, 8],
-    })
+    data = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "C", "D"],
+            "emissions": [100, 80, 120, 60],
+            "output": [10, 10, 15, 8],
+        }
+    )
     per_dmu, summary = ss.analyze(data, input_col="emissions", output_cols=["output"], id_col="dmu")
     assert "peer" in per_dmu.columns
     a_row = per_dmu.loc[per_dmu["dmu"] == "A"].iloc[0]

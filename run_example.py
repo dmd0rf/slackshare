@@ -13,6 +13,7 @@ Run:
 import argparse
 import time
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -22,6 +23,7 @@ import slackshare as ss
 # ============================================================================
 # DATA GENERATION
 # ============================================================================
+
 
 def generate_panel(n_dmus=500, seed=0):
     """Generate synthetic long-format panel data: 500 DMUs, 40 inputs, 12 outputs (sparse), 12 dates."""
@@ -59,7 +61,7 @@ def generate_panel(n_dmus=500, seed=0):
     input_rows = []
     output_rows = []
 
-    for d_idx, dmu in enumerate(range(n_dmus)):
+    for d_idx, _dmu in enumerate(range(n_dmus)):
         dmu_id = f"dmu_{d_idx:05d}"
         scale = dmu_scale[d_idx]
 
@@ -71,12 +73,14 @@ def generate_panel(n_dmus=500, seed=0):
                 noise = rng.lognormal(mean=0, sigma=0.25)
                 value = scale * input_base[k] * time_mult * noise
                 value = max(value, 1e-6)
-                input_rows.append({
-                    "dmu": dmu_id,
-                    "date": date,
-                    "input": f"input_{k:02d}",
-                    "value": value,
-                })
+                input_rows.append(
+                    {
+                        "dmu": dmu_id,
+                        "date": date,
+                        "input": f"input_{k:02d}",
+                        "value": value,
+                    }
+                )
 
             # Outputs: only where active_mask[d_idx, o] is True
             for o in range(N_OUTPUTS):
@@ -86,12 +90,14 @@ def generate_panel(n_dmus=500, seed=0):
                     value = max(value, 1e-6)
                 else:
                     value = 0.0
-                output_rows.append({
-                    "dmu": dmu_id,
-                    "date": date,
-                    "output": f"output_{o:02d}",
-                    "value": value,
-                })
+                output_rows.append(
+                    {
+                        "dmu": dmu_id,
+                        "date": date,
+                        "output": f"output_{o:02d}",
+                        "value": value,
+                    }
+                )
 
     input_df = pd.DataFrame(input_rows)
     input_df["dmu"] = input_df["dmu"].astype("category")
@@ -114,6 +120,7 @@ def generate_panel(n_dmus=500, seed=0):
 # ANALYSIS
 # ============================================================================
 
+
 def run_analysis(input_df, output_df):
     """Run FDH slack analysis on the panel."""
     print("Running FDH analysis...")
@@ -124,6 +131,7 @@ def run_analysis(input_df, output_df):
 # ============================================================================
 # REPORTING: HEATMAP
 # ============================================================================
+
 
 def build_heatmap_report(per_dmu_all, input_names, dmu_names, out_dir):
     """Build heatmap HTML with dropdown for input selection."""
@@ -139,24 +147,18 @@ def build_heatmap_report(per_dmu_all, input_names, dmu_names, out_dir):
         input_data = per_dmu_all[per_dmu_all["input"] == input_name].copy()
 
         # Sort DMUs by ascending mean |slack|
-        dmu_mean_slack = (
-            input_data.groupby("dmu")["slack"]
-            .apply(lambda x: x.abs().mean())
-            .sort_values(ascending=True)
-        )
+        dmu_mean_slack = input_data.groupby("dmu")["slack"].apply(lambda x: x.abs().mean()).sort_values(ascending=True)
         dmu_order = dmu_mean_slack.index.tolist()
 
         # Pivot to heatmap: rows=DMU (sorted), cols=date, values=|slack|
-        heatmap_data = input_data.pivot_table(
-            index="dmu", columns="date", values="slack", aggfunc="first"
-        )
+        heatmap_data = input_data.pivot_table(index="dmu", columns="date", values="slack", aggfunc="first")
         heatmap_data = heatmap_data.abs()
         heatmap_data = heatmap_data.reindex(index=dmu_order, columns=dates)
 
         # Pivot peer identities for tooltip
-        peer_data = input_data.pivot_table(
-            index="dmu", columns="date", values="peer", aggfunc="first"
-        ).reindex(index=dmu_order, columns=dates)
+        peer_data = input_data.pivot_table(index="dmu", columns="date", values="peer", aggfunc="first").reindex(
+            index=dmu_order, columns=dates
+        )
 
         trace = go.Heatmap(
             z=heatmap_data.values,
@@ -223,6 +225,7 @@ def build_heatmap_report(per_dmu_all, input_names, dmu_names, out_dir):
 # ============================================================================
 # REPORTING: BAR + LINE CHART
 # ============================================================================
+
 
 def build_bar_chart_report(summary_all, input_names, out_dir):
     """Build bar + line chart HTML with dropdown for input selection."""
@@ -318,6 +321,7 @@ def build_bar_chart_report(summary_all, input_names, out_dir):
 # MAIN
 # ============================================================================
 
+
 def main(n_dmus=500, out_dir=None):
     """Generate panel → analyze → build reports."""
     if out_dir is None:
@@ -344,12 +348,13 @@ def main(n_dmus=500, out_dir=None):
     print(f"✓ Analyzed in {ana_time:.1f}s: {len(per_dmu_all):,} per-DMU rows, {len(summary_all):,} summary rows")
 
     if ana_time > 60:
-        print(f"  (Note: runtime scales as O(n²), so larger n_dmus will be much slower)")
+        print("  (Note: runtime scales as O(n²), so larger n_dmus will be much slower)")
 
     # Get metadata
     input_names = sorted(per_dmu_all["input"].unique())
     dmu_names = sorted(per_dmu_all["dmu"].unique())
-    print(f"  DMUs: {len(dmu_names)}, Inputs: {len(input_names)}, Outputs: {len([c for c in per_dmu_all.columns if c.startswith('output_')])}")
+    n_outputs = len([c for c in per_dmu_all.columns if c.startswith("output_")])
+    print(f"  DMUs: {len(dmu_names)}, Inputs: {len(input_names)}, Outputs: {n_outputs}")
 
     # Build reports
     print()
@@ -363,7 +368,7 @@ def main(n_dmus=500, out_dir=None):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="FDH slack analysis example: generate panel, analyze, build HTML reports")
+    parser = argparse.ArgumentParser(description="FDH slack analysis example: generate, analyze, report")
     parser.add_argument("--n-dmus", type=int, default=500, help="Number of DMUs (default 500)")
     parser.add_argument("--out-dir", type=str, default=None, help="Output directory (default: output)")
     args = parser.parse_args()

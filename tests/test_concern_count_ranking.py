@@ -1,23 +1,18 @@
 import pandas as pd
 import pytest
+
 import slackshare as ss
 
 
 @pytest.fixture(scope="module")
 def slack_and_ground_truth():
     """Load panel data, run analyze_panel, compute total slack per DMU, and load ground truth."""
-    inputs = pd.read_csv("shared_data/panel_inputs.csv").rename(columns={
-        "dmu_id": "dmu",
-        "period": "date",
-        "input_name": "input",
-        "input_value": "value"
-    })
-    outputs = pd.read_csv("shared_data/panel_outputs.csv").rename(columns={
-        "dmu_id": "dmu",
-        "period": "date",
-        "output_name": "output",
-        "output_value": "value"
-    })
+    inputs = pd.read_csv("shared_data/panel_inputs.csv").rename(
+        columns={"dmu_id": "dmu", "period": "date", "input_name": "input", "input_value": "value"}
+    )
+    outputs = pd.read_csv("shared_data/panel_outputs.csv").rename(
+        columns={"dmu_id": "dmu", "period": "date", "output_name": "output", "output_value": "value"}
+    )
 
     per_dmu, _ = ss.analyze_panel(inputs, outputs)
 
@@ -70,7 +65,7 @@ def test_slack_ranking_vs_ground_truth_top50(slack_and_ground_truth):
     n_dmus = len(slack_by_dmu.index.intersection(perf_rank.index))
     expected_overlap = (50 * 50) / n_dmus
 
-    print(f"\n=== TOP 50 WORST ENTITIES ===")
+    print("\n=== TOP 50 WORST ENTITIES ===")
     print(f"Total DMUs in common: {n_dmus}")
     print(f"Expected overlap by random chance: {expected_overlap:.1f}")
     print(f"\nOverlap (slack vs performance_rank): {overlap_perf}/50 (vs {expected_overlap:.1f} expected)")

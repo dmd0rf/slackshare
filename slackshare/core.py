@@ -10,7 +10,13 @@ import numpy as np
 import pandas as pd
 
 
-def fdh_scores(data: pd.DataFrame, *, input_col: str, output_cols: list[str], id_col: str | None = None) -> pd.DataFrame:
+def fdh_scores(
+    data: pd.DataFrame,
+    *,
+    input_col: str,
+    output_cols: list[str],
+    id_col: str | None = None,
+) -> pd.DataFrame:
     """Per-DMU x_star, slack, efficient, peer. Raises if input_col has negative values.
 
     peer: identifier of the DMU that achieves x_star for this DMU. Among ties, chosen via
@@ -90,7 +96,13 @@ def dmu_shares(scored: pd.DataFrame, *, input_col: str) -> pd.DataFrame:
     return out
 
 
-def analyze(data: pd.DataFrame, *, input_col: str, output_cols: list[str], id_col: str | None = None) -> tuple[pd.DataFrame, dict]:
+def analyze(
+    data: pd.DataFrame,
+    *,
+    input_col: str,
+    output_cols: list[str],
+    id_col: str | None = None,
+) -> tuple[pd.DataFrame, dict]:
     """fdh_scores + dmu_shares + aggregate in one call."""
     scored = fdh_scores(data, input_col=input_col, output_cols=output_cols, id_col=id_col)
     return dmu_shares(scored, input_col=input_col), aggregate(scored, input_col=input_col)

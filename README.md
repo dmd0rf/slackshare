@@ -1,5 +1,7 @@
 # slackshare
 
+[![CI](https://github.com/dmd0rf/slackshare/actions/workflows/ci.yml/badge.svg)](https://github.com/dmd0rf/slackshare/actions/workflows/ci.yml)
+
 Input-oriented Free Disposal Hull (FDH) slack analysis for a single (typically undesirable) input, e.g. emissions, waste, energy use.
 
 ## Visual Overview
@@ -47,11 +49,13 @@ pip install -e .
 import pandas as pd
 import slackshare as ss
 
-data = pd.DataFrame({
-    "dmu":       ["A", "B", "C", "D"],
-    "emissions": [100, 80, 120, 60],
-    "output":    [10, 10, 15, 8],
-})
+data = pd.DataFrame(
+    {
+        "dmu": ["A", "B", "C", "D"],
+        "emissions": [100, 80, 120, 60],
+        "output": [10, 10, 15, 8],
+    }
+)
 
 per_dmu, summary = ss.analyze(data, input_col="emissions", output_cols=["output"])
 
@@ -85,8 +89,8 @@ per_dmu, summary = ss.analyze(
 ## Step-by-step API
 
 ```python
-scored   = ss.fdh_scores(data, input_col="emissions", output_cols=["output"], id_col="dmu")
-summary  = ss.aggregate(scored, input_col="emissions")
+scored = ss.fdh_scores(data, input_col="emissions", output_cols=["output"], id_col="dmu")
+summary = ss.aggregate(scored, input_col="emissions")
 with_shr = ss.dmu_shares(scored, input_col="emissions")
 ```
 

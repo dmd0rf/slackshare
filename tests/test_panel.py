@@ -1,5 +1,5 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
 
 import slackshare as ss
@@ -8,21 +8,29 @@ import slackshare as ss
 @pytest.fixture
 def panel_data_happy():
     """2 dates × 2 input types × 2 output types, 3 DMUs. All data present and valid."""
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B", "C"] * 4,
-        "date": [pd.Timestamp("2024-01-01")] * 3 + [pd.Timestamp("2024-01-02")] * 3 +
-                [pd.Timestamp("2024-01-01")] * 3 + [pd.Timestamp("2024-01-02")] * 3,
-        "input": (["labor"] * 6) + (["capital"] * 6),
-        "value": [10, 12, 8, 11, 13, 9, 5, 6, 4, 5.5, 6.5, 4.5],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "C"] * 4,
+            "date": [pd.Timestamp("2024-01-01")] * 3
+            + [pd.Timestamp("2024-01-02")] * 3
+            + [pd.Timestamp("2024-01-01")] * 3
+            + [pd.Timestamp("2024-01-02")] * 3,
+            "input": (["labor"] * 6) + (["capital"] * 6),
+            "value": [10, 12, 8, 11, 13, 9, 5, 6, 4, 5.5, 6.5, 4.5],
+        }
+    )
 
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B", "C"] * 4,
-        "date": [pd.Timestamp("2024-01-01")] * 3 + [pd.Timestamp("2024-01-02")] * 3 +
-                [pd.Timestamp("2024-01-01")] * 3 + [pd.Timestamp("2024-01-02")] * 3,
-        "output": (["revenue"] * 6) + (["quality"] * 6),
-        "value": [100, 120, 90, 110, 130, 100, 8, 9, 7, 8.5, 9.5, 7.5],
-    })
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "C"] * 4,
+            "date": [pd.Timestamp("2024-01-01")] * 3
+            + [pd.Timestamp("2024-01-02")] * 3
+            + [pd.Timestamp("2024-01-01")] * 3
+            + [pd.Timestamp("2024-01-02")] * 3,
+            "output": (["revenue"] * 6) + (["quality"] * 6),
+            "value": [100, 120, 90, 110, 130, 100, 8, 9, 7, 8.5, 9.5, 7.5],
+        }
+    )
 
     return input_df, output_df
 
@@ -58,54 +66,66 @@ def test_analyze_panel_happy_path(panel_data_happy):
 
 
 def test_mismatched_dmus():
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "input": ["labor"] * 2,
-        "value": [10, 12],
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "C"],  # C instead of B
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "output": ["revenue"] * 2,
-        "value": [100, 110],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "input": ["labor"] * 2,
+            "value": [10, 12],
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "C"],  # C instead of B
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "output": ["revenue"] * 2,
+            "value": [100, 110],
+        }
+    )
     with pytest.raises(ValueError, match="DMU sets do not match"):
         ss.analyze_panel(input_df, output_df)
 
 
 def test_mismatched_dates():
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "input": ["labor"] * 2,
-        "value": [10, 12],
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-02")] * 2,  # Different date
-        "output": ["revenue"] * 2,
-        "value": [100, 110],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "input": ["labor"] * 2,
+            "value": [10, 12],
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-02")] * 2,  # Different date
+            "output": ["revenue"] * 2,
+            "value": [100, 110],
+        }
+    )
     with pytest.raises(ValueError, match="Date sets do not match"):
         ss.analyze_panel(input_df, output_df)
 
 
 def test_missing_input_row():
     """Missing input for a (dmu, date, input_type) produces NA for that DMU in that slice."""
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B", "A"],
-        "date": [pd.Timestamp("2024-01-01")] * 3,
-        "input": ["labor", "labor", "capital"],
-        "value": [10, 12, 5],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "A"],
+            "date": [pd.Timestamp("2024-01-01")] * 3,
+            "input": ["labor", "labor", "capital"],
+            "value": [10, 12, 5],
+        }
+    )
     # B missing capital input
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "output": ["revenue"] * 2,
-        "value": [100, 110],
-    })
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "output": ["revenue"] * 2,
+            "value": [100, 110],
+        }
+    )
     per_dmu, summary = ss.analyze_panel(input_df, output_df)
 
     # Slice (2024-01-01, labor): both A and B eligible (have both labor input and revenue output)
@@ -120,36 +140,44 @@ def test_missing_input_row():
 
 
 def test_duplicate_output_rows():
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "input": ["labor"] * 2,
-        "value": [10, 12],
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B", "A"],  # A appears twice for revenue
-        "date": [pd.Timestamp("2024-01-01")] * 3,
-        "output": ["revenue", "revenue", "revenue"],
-        "value": [100, 110, 105],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "input": ["labor"] * 2,
+            "value": [10, 12],
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "A"],  # A appears twice for revenue
+            "date": [pd.Timestamp("2024-01-01")] * 3,
+            "output": ["revenue", "revenue", "revenue"],
+            "value": [100, 110, 105],
+        }
+    )
     with pytest.raises(ValueError, match="Duplicate"):
         ss.analyze_panel(input_df, output_df)
 
 
 def test_nan_value_in_input():
     """Explicit NaN in input value is treated as missing; row receives NA results."""
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "input": ["labor"] * 2,
-        "value": [10, np.nan],
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "output": ["revenue"] * 2,
-        "value": [100, 110],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "input": ["labor"] * 2,
+            "value": [10, np.nan],
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "output": ["revenue"] * 2,
+            "value": [100, 110],
+        }
+    )
     per_dmu, summary = ss.analyze_panel(input_df, output_df)
 
     # A is eligible (input 10, output 100), B is not (input NaN)
@@ -163,36 +191,44 @@ def test_nan_value_in_input():
 
 
 def test_negative_input_value():
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "input": ["labor"] * 2,
-        "value": [10, -5],  # Negative input
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "output": ["revenue"] * 2,
-        "value": [100, 110],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "input": ["labor"] * 2,
+            "value": [10, -5],  # Negative input
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "output": ["revenue"] * 2,
+            "value": [100, 110],
+        }
+    )
     with pytest.raises(ValueError, match="must not be negative"):
         ss.analyze_panel(input_df, output_df)
 
 
 def test_all_zero_output_raises():
     """If any DMU has all-zero outputs in a slice, analyze_panel raises ValueError."""
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "input": ["labor"] * 2,
-        "value": [10, 12],
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "output": ["revenue"] * 2,
-        "value": [0, 0],  # all-zero outputs
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "input": ["labor"] * 2,
+            "value": [10, 12],
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "output": ["revenue"] * 2,
+            "value": [0, 0],  # all-zero outputs
+        }
+    )
     with pytest.raises(ValueError, match="must not be all zero"):
         ss.analyze_panel(input_df, output_df)
 
@@ -205,36 +241,44 @@ def test_empty_dataframes():
 
 
 def test_negative_output_propagates():
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "input": ["labor"] * 2,
-        "value": [10, 12],
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "output": ["revenue"] * 2,
-        "value": [100, -5],  # negative output
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "input": ["labor"] * 2,
+            "value": [10, 12],
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "output": ["revenue"] * 2,
+            "value": [100, -5],  # negative output
+        }
+    )
     with pytest.raises(ValueError, match="must not contain negative"):
         ss.analyze_panel(input_df, output_df)
 
 
 def test_missing_one_output_type():
     """Missing one output type for a DMU at a date makes that DMU ineligible across all input types at that date."""
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B"] * 2,
-        "date": [pd.Timestamp("2024-01-01")] * 4,
-        "input": ["labor", "labor", "capital", "capital"],
-        "value": [10, 12, 5, 6],
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B", "A"],
-        "date": [pd.Timestamp("2024-01-01")] * 3,
-        "output": ["revenue", "revenue", "quality"],
-        "value": [100, 110, 8],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"] * 2,
+            "date": [pd.Timestamp("2024-01-01")] * 4,
+            "input": ["labor", "labor", "capital", "capital"],
+            "value": [10, 12, 5, 6],
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "A"],
+            "date": [pd.Timestamp("2024-01-01")] * 3,
+            "output": ["revenue", "revenue", "quality"],
+            "value": [100, 110, 8],
+        }
+    )
     # B is missing quality output at this date
 
     per_dmu, summary = ss.analyze_panel(input_df, output_df)
@@ -250,18 +294,22 @@ def test_missing_one_output_type():
 
 def test_fully_empty_slice():
     """Slice with no eligible DMUs (all missing) produces NAs and zero aggregates."""
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "input": ["labor"] * 2,
-        "value": [np.nan, np.nan],  # both missing
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "output": ["revenue"] * 2,
-        "value": [100, 110],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "input": ["labor"] * 2,
+            "value": [np.nan, np.nan],  # both missing
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "output": ["revenue"] * 2,
+            "value": [100, 110],
+        }
+    )
     per_dmu, summary = ss.analyze_panel(input_df, output_df)
 
     # All per-DMU results should be NA
@@ -277,18 +325,22 @@ def test_fully_empty_slice():
 
 def test_aggregate_skip_na_correctness():
     """Aggregate metrics skip missing DMUs: one incomplete DMU among several doesn't invalidate the slice."""
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B", "C"],
-        "date": [pd.Timestamp("2024-01-01")] * 3,
-        "input": ["labor"] * 3,
-        "value": [100, np.nan, 50],  # B is missing
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B", "C"],
-        "date": [pd.Timestamp("2024-01-01")] * 3,
-        "output": ["revenue"] * 3,
-        "value": [10, 10, 10],  # all have same output
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "C"],
+            "date": [pd.Timestamp("2024-01-01")] * 3,
+            "input": ["labor"] * 3,
+            "value": [100, np.nan, 50],  # B is missing
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "C"],
+            "date": [pd.Timestamp("2024-01-01")] * 3,
+            "output": ["revenue"] * 3,
+            "value": [10, 10, 10],  # all have same output
+        }
+    )
     per_dmu, summary = ss.analyze_panel(input_df, output_df)
 
     # B should have NA results
@@ -301,7 +353,7 @@ def test_aggregate_skip_na_correctness():
     assert a_row["x_star"] == 50
     assert a_row["slack"] == 50  # 100 - 50
     assert c_row["x_star"] == 50
-    assert c_row["slack"] == 0   # 50 - 50
+    assert c_row["slack"] == 0  # 50 - 50
 
     # Aggregates over A and C only: total_input=150, total_slack=50, slack_share=50/150
     summary_row = summary.iloc[0]
@@ -312,18 +364,22 @@ def test_aggregate_skip_na_correctness():
 
 def test_missing_entire_output_type():
     """Output type with zero rows for every DMU at a date → all DMUs ineligible, no KeyError."""
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "input": ["labor"] * 2,
-        "value": [10, 12],
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "output": ["revenue"] * 2,
-        "value": [100, 110],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "input": ["labor"] * 2,
+            "value": [10, 12],
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "output": ["revenue"] * 2,
+            "value": [100, 110],
+        }
+    )
     # quality output has no rows for any DMU
 
     per_dmu, summary = ss.analyze_panel(input_df, output_df)
@@ -335,36 +391,44 @@ def test_missing_entire_output_type():
 
 def test_panel_peer_column_exists():
     """Panel results include peer column."""
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B"] * 2,
-        "date": [pd.Timestamp("2024-01-01")] * 4,
-        "input": ["labor", "labor", "capital", "capital"],
-        "value": [100, 80, 50, 60],
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B"] * 2,
-        "date": [pd.Timestamp("2024-01-01")] * 4,
-        "output": ["revenue", "revenue", "quality", "quality"],
-        "value": [10, 10, 5, 6],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"] * 2,
+            "date": [pd.Timestamp("2024-01-01")] * 4,
+            "input": ["labor", "labor", "capital", "capital"],
+            "value": [100, 80, 50, 60],
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"] * 2,
+            "date": [pd.Timestamp("2024-01-01")] * 4,
+            "output": ["revenue", "revenue", "quality", "quality"],
+            "value": [10, 10, 5, 6],
+        }
+    )
     per_dmu, summary = ss.analyze_panel(input_df, output_df)
     assert "peer" in per_dmu.columns
 
 
 def test_panel_peer_eligible_dmu():
     """Eligible DMUs have non-NA peer values."""
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "input": ["labor"] * 2,
-        "value": [100, 80],
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "output": ["revenue"] * 2,
-        "value": [10, 10],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "input": ["labor"] * 2,
+            "value": [100, 80],
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "output": ["revenue"] * 2,
+            "value": [10, 10],
+        }
+    )
     per_dmu, summary = ss.analyze_panel(input_df, output_df)
     a_row = per_dmu[per_dmu["dmu"] == "A"].iloc[0]
     b_row = per_dmu[per_dmu["dmu"] == "B"].iloc[0]
@@ -377,18 +441,22 @@ def test_panel_peer_eligible_dmu():
 
 def test_panel_peer_ineligible_dmu_na():
     """Ineligible DMUs have NA peer."""
-    input_df = pd.DataFrame({
-        "dmu": ["A", "B", "A"],
-        "date": [pd.Timestamp("2024-01-01")] * 3,
-        "input": ["labor", "labor", "capital"],
-        "value": [100, np.nan, 50],
-    })
-    output_df = pd.DataFrame({
-        "dmu": ["A", "B"],
-        "date": [pd.Timestamp("2024-01-01")] * 2,
-        "output": ["revenue"] * 2,
-        "value": [10, 10],
-    })
+    input_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B", "A"],
+            "date": [pd.Timestamp("2024-01-01")] * 3,
+            "input": ["labor", "labor", "capital"],
+            "value": [100, np.nan, 50],
+        }
+    )
+    output_df = pd.DataFrame(
+        {
+            "dmu": ["A", "B"],
+            "date": [pd.Timestamp("2024-01-01")] * 2,
+            "output": ["revenue"] * 2,
+            "value": [10, 10],
+        }
+    )
     per_dmu, summary = ss.analyze_panel(input_df, output_df)
     # B should be ineligible in the labor slice (input is NA)
     labor_slice = per_dmu[per_dmu["input"] == "labor"]
