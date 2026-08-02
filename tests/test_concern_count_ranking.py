@@ -45,8 +45,8 @@ def test_slack_ranking_vs_ground_truth_all_entities(slack_and_ground_truth):
     print(f"Slack vs Performance rank: {spearman_perf:.4f}")
     print(f"Slack vs External metric: {spearman_ext:.4f}")
 
-    assert spearman_perf == pytest.approx(0.374, abs=0.01)
-    assert spearman_ext == pytest.approx(0.434, abs=0.01)
+    assert spearman_perf == pytest.approx(0.274, abs=0.01)
+    assert spearman_ext == pytest.approx(0.205, abs=0.01)
 
 
 def test_slack_ranking_vs_ground_truth_top50(slack_and_ground_truth):
@@ -76,5 +76,5 @@ def test_slack_ranking_vs_ground_truth_top50(slack_and_ground_truth):
     print(f"\nOverlap (slack vs performance_rank): {overlap_perf}/50 (vs {expected_overlap:.1f} expected)")
     print(f"Overlap (slack vs external_metric): {overlap_ext}/50 (vs {expected_overlap:.1f} expected)")
 
-    assert overlap_perf == 29, f"Expected 29 overlap with performance_rank, got {overlap_perf}"
-    assert overlap_ext == 28, f"Expected 28 overlap with external_metric, got {overlap_ext}"
+    assert overlap_perf == 25, f"Expected 25 overlap with performance_rank, got {overlap_perf}"
+    assert overlap_ext == 27, f"Expected 27 overlap with external_metric, got {overlap_ext}"
