@@ -20,8 +20,11 @@ def _analyze_slice(merged: pd.DataFrame, output_types: list[str]) -> tuple[pd.Da
 
     # Initialize result columns with NaN
     out = merged.copy()
-    for col in ["x_star", "slack", "efficient", "share_of_total_input", "share_of_total_slack", "peer"]:
+    for col in ["x_star", "slack", "share_of_total_input", "share_of_total_slack"]:
         out[col] = np.nan
+    # Use object dtype for columns that will hold mixed types (NaN + bool/str)
+    for col in ["efficient", "peer"]:
+        out[col] = pd.Series(np.nan, index=out.index, dtype=object)
 
     # If any DMU is eligible, analyze the subset and backfill results by index
     if eligible_mask.any():
