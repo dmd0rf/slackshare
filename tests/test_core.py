@@ -227,3 +227,82 @@ def test_all_efficient_shares_are_zero():
 
     assert summary["total_slack"] == 0
     assert (per_dmu["share_of_total_slack"] == 0.0).all()  # no NaN
+
+
+def test_peer_column_exists():
+    data = pd.DataFrame({
+        "dmu": ["A", "B", "C", "D"],
+        "emissions": [100, 80, 120, 60],
+        "output": [10, 10, 15, 8],
+    })
+    scored = ss.fdh_scores(data, input_col="emissions", output_cols=["output"], id_col="dmu")
+    assert "peer" in scored.columns
+    assert len(scored["peer"]) == 4
+
+
+def test_peer_self_when_efficient():
+    data = pd.DataFrame({
+        "dmu": ["A", "B", "C", "D"],
+        "emissions": [100, 80, 120, 60],
+        "output": [10, 10, 15, 8],
+    })
+    scored = ss.fdh_scores(data, input_col="emissions", output_cols=["output"], id_col="dmu")
+    # B, C, D are efficient; A is not
+    b_row = scored.loc[scored["dmu"] == "B"].iloc[0]
+    c_row = scored.loc[scored["dmu"] == "C"].iloc[0]
+    d_row = scored.loc[scored["dmu"] == "D"].iloc[0]
+    assert b_row["peer"] == "B"
+    assert c_row["peer"] == "C"
+    assert d_row["peer"] == "D"
+
+
+def test_peer_points_to_benchmark():
+    data = pd.DataFrame({
+        "dmu": ["A", "B", "C", "D"],
+        "emissions": [100, 80, 120, 60],
+        "output": [10, 10, 15, 8],
+    })
+    scored = ss.fdh_scores(data, input_col="emissions", output_cols=["output"], id_col="dmu")
+    # A: output=10, dominators are A, B, C (with emissions 100, 80, 120)
+    # x_star should be 80, peer should be B
+    a_row = scored.loc[scored["dmu"] == "A"].iloc[0]
+    assert a_row["x_star"] == 80
+    assert a_row["peer"] == "B"
+
+
+def test_peer_alphabetical_tiebreak():
+    # Two DMUs with the same input, both are benchmarks for a third
+    data = pd.DataFrame({
+        "dmu": ["Z", "A", "B"],
+        "input": [100, 50, 50],
+        "output": [5, 10, 10],
+    })
+    scored = ss.fdh_scores(data, input_col="input", output_cols=["output"], id_col="dmu")
+    # Z: output=5, dominators are all three: Z(100), A(50), B(50)
+    # x_star = min(100, 50, 50) = 50, peer should be "A" (alphabetically before "B")
+    z_row = scored.loc[scored["dmu"] == "Z"].iloc[0]
+    assert z_row["x_star"] == 50
+    assert z_row["peer"] == "A"
+
+
+def test_peer_default_uses_index():
+    # When id_col=None, peer should be the index value as string
+    data = pd.DataFrame({
+        "input": [100, 80, 120, 60],
+        "output": [10, 10, 15, 8],
+    }, index=["A", "B", "C", "D"])
+    scored = ss.fdh_scores(data, input_col="input", output_cols=["output"], id_col=None)
+    a_row = scored.loc["A"]
+    assert a_row["peer"] == "B"  # B's input (80) is minimal among A's dominators
+
+
+def test_peer_with_analyze():
+    data = pd.DataFrame({
+        "dmu": ["A", "B", "C", "D"],
+        "emissions": [100, 80, 120, 60],
+        "output": [10, 10, 15, 8],
+    })
+    per_dmu, summary = ss.analyze(data, input_col="emissions", output_cols=["output"], id_col="dmu")
+    assert "peer" in per_dmu.columns
+    a_row = per_dmu.loc[per_dmu["dmu"] == "A"].iloc[0]
+    assert a_row["peer"] == "B"

@@ -5,6 +5,7 @@
 \usepackage{amsthm}
 \usepackage{booktabs}
 \usepackage{xcolor}
+\usepackage{graphicx}
 
 \theoremstyle{definition}
 \newtheorem{definition}{Definition}
@@ -14,7 +15,7 @@
 \newtheorem{remark}{Remark}
 
 \title{Input-oriented FDH Slack Analysis: \\ Formulation and Aggregate Decomposition}
-\author{slackshare package}
+\author{slackshare package (v0.1.0)}
 \date{\today}
 
 \begin{document}
@@ -22,14 +23,35 @@
 \maketitle
 
 \begin{abstract}
-We formalize the input-oriented Free Disposal Hull (FDH) slack analysis used by the \texttt{slackshare} package.
-We define FDH-efficient input levels, compute avoidable slack per decision-making unit (DMU), and decompose
-total input across all DMUs into a system-wide ``slack share'' and per-DMU contributions. We then extend this
-analysis to panel data (multiple dates and input types) by analyzing independent cross-sectional slices.
-The panel extension gracefully handles incomplete data: missing inputs or outputs for individual DMUs are treated as
-ineligible for analysis at that slice, with results propagated as NA, while aggregate metrics are computed over
-the observed (eligible) subset using skip-NA semantics. A worked example illustrates the method on synthetic data.
+We formalize the input-oriented Free Disposal Hull (FDH) slack analysis used by the \texttt{slackshare} package (v0.1.0).
+We define FDH-efficient input levels, compute avoidable slack per decision-making unit (DMU), and identify the peer
+unit that sets the efficiency frontier for each DMU. We decompose total input across all DMUs into a system-wide ``slack share''
+and per-DMU contributions. We then extend this analysis to panel data (multiple dates and input types) by analyzing independent
+cross-sectional slices. The panel extension gracefully handles incomplete data: missing inputs or outputs for individual DMUs are
+treated as ineligible for analysis at that slice, with results propagated as NA, while aggregate metrics are computed over the
+observed (eligible) subset using skip-NA semantics. We formalize a catalogue of degenerate cases and their handling. Worked examples
+illustrate the method on synthetic data and explore the curse of dimensionality in multi-output settings.
 \end{abstract}
+
+\section{Introduction: Visual Overview}
+
+The following figures illustrate the key outputs of an FDH slack analysis on a synthetic panel dataset:
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\textwidth]{../demo1.png}
+\caption{\textbf{Slack by DMU (heatmap).} Each row is a decision-making unit; color intensity represents avoidable input slack over 12 monthly dates (purple = efficient, yellow = wasteful). DMUs are sorted by median slack, and a dropdown selector allows switching between all 40 input types. Hovering on a cell reveals the exact DMU, date, slack value, and the peer DMU that set the efficiency benchmark.}
+\label{fig:slack_heatmap}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\textwidth]{../demo2.png}
+\caption{\textbf{Total Input \& Slack Share (bar + line).} Blue bars show the population's aggregate input consumption over time. The orange line overlays the \emph{slack share} — the percentage of total input that is avoidable excess (waste). This metric reveals whether the population is becoming more or less efficient across the time horizon.}
+\label{fig:slack_share}
+\end{figure}
+
+We now formalize the method that produces these figures.
 
 \section{Setup and Notation}
 
@@ -37,6 +59,31 @@ Consider a set of $n$ decision-making units (DMUs), indexed $i = 1, \ldots, n$.
 Each DMU $i$ consumes a single (typically undesirable) input $x_i \ge 0$ and produces a vector of $K$ outputs
 $y_i = (y_i^1, \ldots, y_i^K) \in \mathbb{R}_{\ge 0}^K$.
 Throughout, we write vector inequalities component-wise: $y_j \ge y_i$ means $y_j^k \ge y_i^k$ for all $k = 1, \ldots, K$.
+
+\subsection*{Notation to Implementation}
+
+The following table maps mathematical notation to \texttt{slackshare} function signatures and output columns:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Concept} & \textbf{Notation} & \textbf{Code} \\
+\midrule
+DMU identifier & $i$ & \texttt{id\_col} parameter \\
+DMU input value & $x_i$ & \texttt{input\_col} parameter \\
+DMU output vector & $y_i$ & \texttt{output\_cols} parameter \\
+Efficient input level & $x_i^*$ & \texttt{x\_star} column \\
+Avoidable slack & $\text{slack}_i$ & \texttt{slack} column \\
+Efficiency flag & $\text{slack}_i = 0$ & \texttt{efficient} column \\
+Peer DMU (benchmark) & peer of $i$ & \texttt{peer} column \\
+Slack share fraction & $\text{slack\_share}$ & summary dict key \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The package always computes the \texttt{peer} column, which identifies the benchmark unit (the one achieving $x_i^*$).
+When multiple units tie for the minimum input among dominators, the alphabetically first DMU identifier breaks the tie.
 
 \section{FDH Dominance and Efficient Input}
 
@@ -52,13 +99,7 @@ x_i^{*} = \min_{j \in D(i)} x_j.
 \end{equation}
 
 Since $i \in D(i)$, we have $x_i^* \le x_i$ always, and $x_i^*$ is well-defined and non-negative (even when $D(i) = \{i\}$ alone).
-
-\begin{proposition}
-For all $i$, $x_i^* \le x_i$. Hence, the slack $\text{slack}_i := x_i - x_i^* \ge 0$ is well-defined and non-negative.
-\end{proposition}
-\begin{proof}
-Since $i \in D(i)$, we have $x_i^* = \min_{j \in D(i)} x_j \le x_i$. \qed
-\end{proof}
+Hence, the slack $\text{slack}_i := x_i - x_i^* \ge 0$ is well-defined and non-negative.
 
 \section{Slack and Efficiency}
 
@@ -68,9 +109,9 @@ A DMU is \emph{FDH-efficient} if and only if $\text{slack}_i = 0$, i.e., $x_i = 
 Equivalently, a DMU is efficient if it achieves the minimum input among all units that dominate it on every output.
 
 \begin{remark}
-FDH (Free Disposal Hull) imposes only free disposability and allows no convexity.
+FDH (Free Disposal Hull, \cite{DeprinsSimarTulkens1984}) imposes only free disposability and allows no convexity.
 Thus, each DMU is only compared against \emph{actually observed} dominating units, never against hypothetical convex blends.
-This contrasts with DEA (Data Envelopment Analysis), which constructs a convex frontier and can benchmark against infeasible synthetic units.
+This contrasts with DEA (Data Envelopment Analysis, \cite{CharnesCooperRhodes1978}), which constructs a convex frontier and can benchmark against infeasible synthetic units.
 For a given dataset, FDH yields a coarser (higher) frontier than DEA.
 \end{remark}
 
@@ -95,22 +136,16 @@ Per-DMU contributions to the system are captured by two share metrics:
 
 The first metric expresses each DMU's slack as a fraction of the population's total input.
 The second expresses each DMU's waste as a fraction of system-wide waste (when any exists).
-
-\begin{proposition}
-When $S > 0$, $\sum_{i=1}^{n} \text{share\_of\_total\_slack}_i = 1$.
-\end{proposition}
-\begin{proof}
-\[\sum_{i=1}^{n} \text{share\_of\_total\_slack}_i = \sum_{i=1}^{n} \frac{\text{slack}_i}{S} = \frac{1}{S} \sum_{i=1}^{n} \text{slack}_i = \frac{S}{S} = 1. \qed\]
-\end{proof}
+When $S > 0$, $\sum_{i=1}^{n} \text{share\_of\_total\_slack}_i = 1$ by definition of shares summing to one.
 
 \section{Validity Conditions}
 
 The analysis is well-defined and yields meaningful results under the following preconditions:
 
 \begin{enumerate}
-\item Each $x_i \ge 0$. (Strictly, $x_i > 0$ avoids division-by-zero in aggregate formulas; $x_i = 0$ requires case-by-case treatment.)
+\item Each $x_i \ge 0$. (For slices/datasets with $X = \sum_i x_i = 0$, the ratio $\text{slack\_share} = S / X$ is undefined and a \texttt{ZeroDivisionError} is raised.)
 \item For each $i$, the output vector $y_i$ is not identically zero: $\exists k \, y_i^k > 0$.
-  (Otherwise, DMU $i$ dominates no other units, and the dominance set $D(i) = \{i\}$ alone, which is valid but offers no insight.)
+  (If $y_i \equiv 0$, then $D(i) = \{1, \ldots, n\}$ — the entire population trivially dominates $i$ — making $i$'s benchmark the single globally-cheapest DMU, unrelated to $i$'s actual profile. The package rejects all-zero-output rows to avoid this degenerate case.)
 \item The dataset is non-empty: $n \ge 1$.
 \end{enumerate}
 
@@ -122,14 +157,14 @@ Consider a toy dataset with $n = 4$ DMUs, a single undesirable input (e.g., emis
 
 \begin{table}[h]
 \centering
-\begin{tabular}{cccc}
+\begin{tabular}{ccc}
 \toprule
-DMU & Input $x_i$ & Output $y_i$ & Efficiency \\
+DMU & Input $x_i$ & Output $y_i$ \\
 \midrule
-A & 100 & 10 & ? \\
-B & 80 & 10 & ? \\
-C & 120 & 15 & ? \\
-D & 60 & 8 & ? \\
+A & 100 & 10 \\
+B & 80 & 10 \\
+C & 120 & 15 \\
+D & 60 & 8 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -163,6 +198,42 @@ Total & 360 & 340 & 20 & --- \\
 
 Here, DMUs B, C, and D are efficient; only A is inefficient with slack of 20 units.
 The system-wide slack share is $S / X = 20 / 360 = 0.0556$ (about 5.6\% of total input is avoidable).
+
+\section{Computational Complexity}
+
+For each slice (date, input type), the FDH computation involves:
+\begin{itemize}
+\item For each DMU $i$, identify the dominance set $D(i) = \{j : y_j \ge y_i \text{ on all } K \text{ dimensions}\}$ by scanning all $n$ units.
+\item For each $i$, find $x_i^* = \min_{j \in D(i)} x_j$ among the dominators.
+\end{itemize}
+This yields $O(n^2)$ per-slice time complexity, since each of the $n$ DMUs requires a full $O(n)$ scan of dominance.
+For datasets with many slices (dates $\times$ input types), the total cost can scale substantially; the per-slice loop is embarrassingly parallel
+and can be sped up via \texttt{multiprocessing.Pool} to distribute slices across CPU cores.
+
+\subsection*{Curse of Dimensionality}
+
+A critical limitation of FDH (and DEA) in high output dimensions is the sharply rising fraction of ``trivially efficient'' DMUs.
+As the number of output dimensions $K$ increases, the output space becomes sparse, and most units have unique output profiles undominated by any other.
+
+To illustrate, we generated random single-input, $K$-output datasets with $n=100$ DMUs and uniformly random outputs in $[0, 10]$:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ccc}
+\toprule
+$K$ (output dimensions) & \# Efficient DMUs & \% Efficient \\
+\midrule
+1 & 5 & 5.0\% \\
+2 & 8 & 8.0\% \\
+4 & 51 & 51.0\% \\
+8 & 87 & 87.0\% \\
+12 & 99 & 99.0\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This phenomenon suggests FDH analysis yields the most interpretable results in settings with a small to moderate number of outputs ($K \le 4$) and large sample sizes.
+High-dimensional output spaces require either larger $n$ or dimensionality reduction (aggregation, PCA) to maintain discriminative power.
 
 \section{Panel Data Analysis}
 
@@ -269,9 +340,60 @@ Missing values arise naturally in panel settings: a DMU may not yet be reporting
 The unbalanced extension is implemented in the current \texttt{analyze\_panel} function (see \texttt{slackshare/panel.py}), which gracefully handles missing/unbalanced data by NA propagation and eligible-set aggregation, exactly as formalized in this section. Prior versions enforced complete data; the current version allows missing entries per (dmu, date, input/output) combination and treats them as ineligible, matching the mathematical framework above.
 \end{remark}
 
+\begin{remark}[Structural sparsity vs.~missingness]
+It is important to distinguish between \emph{structural zeros} and \emph{missing values (NA)}. A structural zero is an output legitimately equal to 0 (observed but inactive). Missingness (NA) indicates that the value was not collected or is inapplicable. In the formalization above, both are treated identically in the eligibility rule $E_{t,k}$: any non-NA value (including 0) is retained, while NA entries exclude a DMU. However, from a data-generation perspective, true non-participation (structural absence) should ideally be encoded as NA rather than a literal 0, to distinguish between ``observed to be zero'' and ``not observed.'' The example (\texttt{run\_example.py}) uses literal 0 for brevity; users with genuine structured sparsity should encode inactive dimensions as NA when possible.
+\end{remark}
+
+\section{Catalogue of Degenerate Cases}
+
+We now formalize the handling of several edge cases that arise in practice.
+
+\subsection*{Single-DMU dataset ($n=1$)}
+
+If the dataset contains only one DMU, $D(1) = \{1\}$ and $x_1^* = x_1$, hence $\text{slack}_1 = 0$. The DMU is trivially efficient. Aggregates: $X = x_1$, $S = 0$, $\text{slack\_share} = 0 / x_1 = 0$.
+
+\subsection*{Fully empty eligible set ($E_{t,k} = \emptyset$)}
+
+When a slice has no eligible DMUs (all missing input or output), all per-DMU rows receive NA values for $x_i^*$, $\text{slack}_{i,t,k}$, and $\text{peer}$.
+Aggregates are: $X_{t,k} = 0$ (empty sum), $S_{t,k} = 0$ (empty sum), $\text{slack\_share}_{t,k} = 0/0 = \text{NA}$.
+
+\subsection*{Uniform outputs across all eligible DMUs}
+
+If all eligible DMUs have identical output vector $y$, then $D(i) = E_{t,k}$ for all $i \in E_{t,k}$ (full mutual dominance).
+Thus $x_i^* = \min\{x_j : j \in E_{t,k}\}$ is the same for all, and the globally-cheapest DMU is the peer for everyone else.
+
+\textbf{Example:} Three DMUs with inputs $(100, 80, 90)$ and all with output $y = 10$.
+Then $x_i^* = 80$ for all, so DMU 2 is the peer for all three, and $\text{slack} = (20, 0, 10)$.
+
+\subsection*{All-zero total input ($X_{t,k} = 0$ with $E_{t,k} \ne \emptyset$)}
+
+If all eligible DMUs have $x_i = 0$, the aggregate ratio $\text{slack\_share} = S / X = 0 / 0$ is undefined.
+The implementation raises a \texttt{ZeroDivisionError} when attempting to compute it via \texttt{aggregate()}.
+
+\subsection*{Peer non-uniqueness and tie-breaking}
+
+When multiple units tie for $\min_{j \in D(i)} x_j$, the \texttt{peer} column uses the alphabetically first DMU name (or index) to ensure deterministic selection.
+
+\textbf{Example:} Inputs $(50, 50, 100)$ with outputs $(10, 10, 5)$.
+DMU 3 (output 5) is dominated by all three. Its dominators are $\{1, 2, 3\}$ with inputs $(50, 50, 100)$.
+$x_3^* = 50$, and the tie between DMUs 1 and 2 is broken alphabetically: $\text{peer}_3 = \text{``1''}$ (or ``A'' if named that way).
+
+\subsection*{All-zero-output row (disallowed case)}
+
+If any eligible DMU has $y_i \equiv 0$ (all outputs zero), the analysis raises a \texttt{ValueError}.
+This contrasts with the valid degenerate cases above: zero outputs make a DMU's benchmark the globally-cheapest unit, which is uninformative and likely indicates a data error.
+
+\subsection*{Exactly one eligible DMU in a slice ($|E_{t,k}| = 1$)}
+
+When only one DMU is eligible at a slice, $D(i) = \{i\}$, hence $x_i^* = x_i$ and $\text{slack}_i = 0$.
+The DMU is trivially efficient, and $\text{peer}_i = i$ (self).
+This is distinct from the single-DMU dataset case: here, the slice may have multiple rows (with missing data), but only one is eligible.
+
 \section{Discussion and Limitations}
 
-The FDH approach offers several advantages and limitations:
+\subsection*{General FDH Limitations}
+
+The FDH approach offers several fundamental trade-offs:
 
 \begin{itemize}
 \item \textbf{No hypothetical units.} Unlike DEA, FDH never compares against infeasible synthetic units,
@@ -285,9 +407,46 @@ The FDH approach offers several advantages and limitations:
   potentially missing efficiency gains from convex combinations (e.g., merging or scaling DMUs).
   For some applications, this is a feature (only observed feasible points matter); for others, a limitation.
 
-\item \textbf{Sample size sensitivity.} When $n$ is small, FDH frontiers can be degenerate
-  (e.g., every DMU may be efficient if outputs are sparse or multi-dimensional).
-  Larger datasets typically yield more informative slack patterns.
+\item \textbf{Curse of dimensionality.} As the number of output dimensions $K$ increases, the output space becomes sparse
+  and most DMUs acquire unique profiles undominated by others, causing nearly all units to appear efficient.
+  With random outputs, a dataset of $n=100$ shows $5\%$ efficient at $K=1$, but $51\%$ efficient at $K=4$ and $99\%$ efficient at $K=12$.
+  This fundamental phenomenon affects any dominance-based frontier method and suggests FDH analysis yields most interpretable results
+  in moderately-dimensional settings ($K \le 4$) with large sample sizes.
 \end{itemize}
+
+\subsection*{Implementation-Specific Limitations}
+
+This package's current design has several specific limitations:
+
+\begin{itemize}
+\item \textbf{Computational complexity.} The per-slice cost is $O(n^2)$, which scales quickly for large datasets.
+  For large-scale analyses, parallelizing the per-slice loop via \texttt{multiprocessing.Pool} is straightforward and effective.
+
+\item \textbf{Full-output-vector eligibility.} The eligibility rule $E_{t,k}$ requires all $K$ output columns to be non-NA simultaneously.
+  In datasets with many sparse outputs (only a few active per DMU), this requirement can exclude large fractions of the population
+  from analysis at each slice, reducing the informative frontier.
+
+\item \textbf{No peer/benchmark guidance.} The \texttt{peer} column identifies which DMU sets the frontier but does not
+  provide counterfactual adjustments or guidance on how to close the gap between a DMU and its peer.
+
+\item \textbf{No cross-input aggregation.} Slack is computed independently per (date, input type) pair; there is currently no formalized way
+  to combine a single DMU's slack across multiple input types into one overall efficiency measure. Users must aggregate such results post-hoc
+  (deferred to future versions).
+\end{itemize}
+
+\begin{thebibliography}{99}
+
+\bibitem{CharnesCooperRhodes1978}
+A.~Charnes, W.~W.~Cooper, and E.~Rhodes.
+\newblock Measuring the efficiency of decision making units.
+\newblock \textit{Eur.~J.~Oper.~Res.}, 2(6):429--444, 1978.
+
+\bibitem{DeprinsSimarTulkens1984}
+D.~Deprins, L.~Simar, and H.~Tulkens.
+\newblock Measuring labor inefficiency in post offices.
+\newblock In M.~Marchand, P.~Pestieau, and H.~Tulkens (eds.), \textit{The Performance of Public Enterprises: Concepts and Measurement}, pp.~243--267.
+\newblock North-Holland, 1984.
+
+\end{thebibliography}
 
 \end{document}

@@ -1,7 +1,16 @@
 # slackshare
 
-Input-oriented Free Disposal Hull (FDH) slack analysis for a single
-(typically undesirable) input, e.g. emissions, waste, energy use.
+Input-oriented Free Disposal Hull (FDH) slack analysis for a single (typically undesirable) input, e.g. emissions, waste, energy use.
+
+## Visual Overview
+
+**Slack by DMU:** Each row is a decision-making unit (DMU). Color intensity represents avoidable input slack (purple = efficient, yellow = wasteful). Switch between 40 input types via the dropdown. Interactive: hover to see exact values and the benchmark peer DMU.
+
+![Slack by DMU Heatmap](demo1.png)
+
+**Aggregate Trends:** Bars show total input consumption per month. The orange line shows slack share — the percentage of total input that is avoidable waste. This reveals whether your population is becoming more or less efficient over time.
+
+![Total Input & Slackshare Trend](demo2.png)
 
 ## Concept
 
@@ -69,20 +78,23 @@ per_dmu, summary = ss.analyze(
 | `efficient` | True if `slack == 0` |
 | `share_of_total_input` | `slack_i / sum(x_i)` |
 | `share_of_total_slack` | `slack_i / sum(slack_i)` |
+| `peer` | identifier of the DMU that achieves `x_star` for this DMU; among ties, alphabetically first |
 
 `summary` keys: `total_input`, `total_slack`, `slack_share`.
 
 ## Step-by-step API
 
 ```python
-scored   = ss.fdh_scores(data, input_col="emissions", output_cols=["output"])
+scored   = ss.fdh_scores(data, input_col="emissions", output_cols=["output"], id_col="dmu")
 summary  = ss.aggregate(scored, input_col="emissions")
 with_shr = ss.dmu_shares(scored, input_col="emissions")
 ```
 
 All functions beyond `fdh_scores` require the `input_col` keyword argument to identify which column holds the input values.
 
-## Panel data
+Optional `id_col` (for `fdh_scores` and `analyze`) specifies which column contains DMU identifiers for peer identification; if omitted, uses DataFrame index.
+
+## Panel Data
 
 For multi-date, multi-input-type workflows, use `analyze_panel`:
 
@@ -90,7 +102,65 @@ For multi-date, multi-input-type workflows, use `analyze_panel`:
 per_dmu_df, summary_df = ss.analyze_panel(input_df, output_df)
 ```
 
-where `input_df` and `output_df` are long-format DataFrames with columns `(dmu, date, input/output, value)`. The function runs FDH analysis independently across each `(date, input_type)` slice and returns per-DMU results and summary statistics concatenated across all slices. See [`examples/`](examples/) for a complete worked example with synthetic data and interactive Plotly visualizations.
+where `input_df` and `output_df` are long-format DataFrames with columns `(dmu, date, input/output, value)`. The function runs FDH analysis independently across each `(date, input_type)` slice and returns per-DMU results and summary statistics concatenated across all slices.
+
+## Interactive Example
+
+Run a complete end-to-end example that generates synthetic data, runs FDH analysis, and builds the two interactive HTML charts you see above.
+
+### Setup
+
+Install the optional dependencies:
+
+```bash
+pip install -e ".[example]"
+```
+
+### Run
+
+```bash
+python run_example.py
+```
+
+This generates a synthetic panel (500 DMUs, 40 input types, 12 output types across 12 monthly dates), runs FDH analysis, and builds two interactive HTML reports. Total runtime: ~10 seconds.
+
+Outputs: `output/slack_by_dmu.html` and `output/slack_share.html`
+
+### View the reports
+
+Open the HTML files in your browser:
+
+```bash
+open output/slack_by_dmu.html      # macOS
+xdg-open output/slack_by_dmu.html  # Linux
+start output\slack_by_dmu.html     # Windows
+```
+
+The HTML files are fully self-contained and work offline.
+
+### What you'll see
+
+**output/slack_by_dmu.html** — Interactive heatmap showing slack (waste) for each DMU over time.
+- X-axis: 12 monthly dates
+- Y-axis: 500 DMUs (sorted by slack)
+- Color: intensity of slack (purple = efficient, yellow = wasteful)
+- Dropdown: switch between the 40 input types
+- Hover: see exact DMU id, date, slack value, and the peer DMU that set the benchmark
+
+**output/slack_share.html** — System-wide trend chart.
+- Bars: total input consumption per date
+- Line: slack share (% of input that is avoidable waste)
+- Dropdown: switch between input types
+- Hover: see exact values
+
+### Scale up
+
+To run on a larger dataset (slower, O(n²) runtime):
+
+```bash
+python run_example.py --n-dmus 2000  # ~30s
+python run_example.py --n-dmus 5000  # ~3 minutes
+```
 
 ## Development
 
@@ -104,3 +174,7 @@ pytest
 - Single (undesirable) input; one or more outputs via vector/Pareto dominance.
 - No convexity assumption (this is FDH, not DEA) — so scores reflect pure technical/dominance-based inefficiency, not allocative or convexity-driven inefficiency.
 - Panel data support via `analyze_panel` for multi-date, multi-input-type workflows.
+
+## See also
+
+- [paper](docs/paper.pdf) — Full formalization with worked examples and theoretical analysis.

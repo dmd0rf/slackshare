@@ -331,3 +331,66 @@ def test_missing_entire_output_type():
     # All DMUs should be NA for the revenue slice (have it), but column reindex ensures no KeyError
     revenue_slice = per_dmu[per_dmu["input"] == "revenue"]
     assert not revenue_slice["x_star"].isna().any()  # Both A, B eligible for revenue
+
+
+def test_panel_peer_column_exists():
+    """Panel results include peer column."""
+    input_df = pd.DataFrame({
+        "dmu": ["A", "B"] * 2,
+        "date": [pd.Timestamp("2024-01-01")] * 4,
+        "input": ["labor", "labor", "capital", "capital"],
+        "value": [100, 80, 50, 60],
+    })
+    output_df = pd.DataFrame({
+        "dmu": ["A", "B"] * 2,
+        "date": [pd.Timestamp("2024-01-01")] * 4,
+        "output": ["revenue", "revenue", "quality", "quality"],
+        "value": [10, 10, 5, 6],
+    })
+    per_dmu, summary = ss.analyze_panel(input_df, output_df)
+    assert "peer" in per_dmu.columns
+
+
+def test_panel_peer_eligible_dmu():
+    """Eligible DMUs have non-NA peer values."""
+    input_df = pd.DataFrame({
+        "dmu": ["A", "B"],
+        "date": [pd.Timestamp("2024-01-01")] * 2,
+        "input": ["labor"] * 2,
+        "value": [100, 80],
+    })
+    output_df = pd.DataFrame({
+        "dmu": ["A", "B"],
+        "date": [pd.Timestamp("2024-01-01")] * 2,
+        "output": ["revenue"] * 2,
+        "value": [10, 10],
+    })
+    per_dmu, summary = ss.analyze_panel(input_df, output_df)
+    a_row = per_dmu[per_dmu["dmu"] == "A"].iloc[0]
+    b_row = per_dmu[per_dmu["dmu"] == "B"].iloc[0]
+    # Both have output=10, so both are in each other's dominance set
+    # A: x_star=min(100,80)=80, peer should be "B"
+    # B: x_star=min(100,80)=80, peer should be "B" (self)
+    assert a_row["peer"] == "B"
+    assert b_row["peer"] == "B"
+
+
+def test_panel_peer_ineligible_dmu_na():
+    """Ineligible DMUs have NA peer."""
+    input_df = pd.DataFrame({
+        "dmu": ["A", "B", "A"],
+        "date": [pd.Timestamp("2024-01-01")] * 3,
+        "input": ["labor", "labor", "capital"],
+        "value": [100, np.nan, 50],
+    })
+    output_df = pd.DataFrame({
+        "dmu": ["A", "B"],
+        "date": [pd.Timestamp("2024-01-01")] * 2,
+        "output": ["revenue"] * 2,
+        "value": [10, 10],
+    })
+    per_dmu, summary = ss.analyze_panel(input_df, output_df)
+    # B should be ineligible in the labor slice (input is NA)
+    labor_slice = per_dmu[per_dmu["input"] == "labor"]
+    b_labor = labor_slice[labor_slice["dmu"] == "B"].iloc[0]
+    assert pd.isna(b_labor["peer"])

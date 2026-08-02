@@ -12,7 +12,7 @@ def _analyze_slice(merged: pd.DataFrame, output_types: list[str]) -> tuple[pd.Da
     """Analyze one slice, handling missing (NA) DMUs gracefully.
 
     eligible = DMUs with fully observed input and all output columns.
-    For ineligible DMUs, returns NA for x_star, slack, efficient, shares.
+    For ineligible DMUs, returns NA for x_star, slack, efficient, shares, peer.
     Aggregates (total_input, total_slack, slack_share) computed over eligible set only.
     """
     # Identify eligible DMUs: non-NA input_value AND non-NA all output columns
@@ -20,14 +20,14 @@ def _analyze_slice(merged: pd.DataFrame, output_types: list[str]) -> tuple[pd.Da
 
     # Initialize result columns with NaN
     out = merged.copy()
-    for col in ["x_star", "slack", "efficient", "share_of_total_input", "share_of_total_slack"]:
+    for col in ["x_star", "slack", "efficient", "share_of_total_input", "share_of_total_slack", "peer"]:
         out[col] = np.nan
 
     # If any DMU is eligible, analyze the subset and backfill results by index
     if eligible_mask.any():
         eligible_df = merged[eligible_mask]
         scored, summary = ss.analyze(
-            eligible_df, input_col="input_value", output_cols=output_types
+            eligible_df, input_col="input_value", output_cols=output_types, id_col="dmu"
         )
         # Assign results back to the full frame using index alignment
         out.loc[eligible_df.index, "x_star"] = scored["x_star"].values
@@ -35,6 +35,7 @@ def _analyze_slice(merged: pd.DataFrame, output_types: list[str]) -> tuple[pd.Da
         out.loc[eligible_df.index, "efficient"] = scored["efficient"].values
         out.loc[eligible_df.index, "share_of_total_input"] = scored["share_of_total_input"].values
         out.loc[eligible_df.index, "share_of_total_slack"] = scored["share_of_total_slack"].values
+        out.loc[eligible_df.index, "peer"] = scored["peer"].values
     else:
         # No eligible DMUs: return zero sums and NA ratio
         summary = {
@@ -80,8 +81,9 @@ def analyze_panel(input_df: pd.DataFrame, output_df: pd.DataFrame) -> tuple[pd.D
         (per_dmu_df, summary_df):
         - per_dmu_df: concatenated results across all (date, input) slices,
           with columns: dmu, date, input, all output columns,
-          x_star, slack, efficient, share_of_total_input, share_of_total_slack.
+          x_star, slack, efficient, share_of_total_input, share_of_total_slack, peer.
           Rows for ineligible (incomplete) DMUs contain NA in the FDH result columns.
+          peer is the DMU identifier that achieved x_star for this DMU; among ties, alphabetically first.
         - summary_df: one row per (date, input) slice with columns:
           date, input, total_input, total_slack, slack_share.
           Aggregates are computed over eligible DMUs only. slack_share is NA if no DMU is eligible.
